@@ -2,12 +2,11 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
-// 交換品やハイドアウトの用途データの型定義
 type BarterUsage = {
   type: 'barter' | 'hideout';
-  targetName: string; // 交換で手に入るアイテム名、または隠れ家施設名
-  traderName?: string; // トレーダー名 (barterの場合)
-  requiredCount: number; // 必要個数
+  targetName: string;
+  traderName?: string;
+  requiredCount: number;
 };
 
 type StaticItem = {
@@ -52,29 +51,17 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>('ja');
-  const [isLangLoaded, setIsLangLoaded] = useState(false);
 
   useEffect(() => {
-    const browserLang = navigator.language.toLowerCase();
-    if (!browserLang.startsWith('ja')) setLang('en');
-    setIsLangLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isLangLoaded) return;
-
     const loadLocalData = async () => {
       setLoading(true);
       setErrorMsg(null);
       
       try {
-        // 外部APIではなく、ローカルの静的JSONファイルを読み込む（爆速・エラーゼロ）
         const response = await fetch('/items.json');
-        
         if (!response.ok) {
            throw new Error("アイテムデータの読み込みに失敗しました。public/items.json が配置されているか確認してください。");
         }
-
         const data = await response.json();
         setItems(data);
       } catch (error: any) {
@@ -86,7 +73,7 @@ export default function Home() {
     };
 
     loadLocalData();
-  }, [isLangLoaded]);
+  }, []);
 
   const filteredItems = useMemo(() => {
     if (!search) return items;
@@ -108,7 +95,7 @@ export default function Home() {
         <select 
           value={lang} 
           onChange={(e) => setLang(e.target.value as Lang)} 
-          style={{ padding: '5px 10px', backgroundColor: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer' }}
+          style={{ padding: '8px 12px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', zIndex: 10, position: 'relative' }}
         >
           <option value="ja">日本語</option>
           <option value="en">English</option>
@@ -130,9 +117,6 @@ export default function Home() {
       {errorMsg ? (
         <div style={{ backgroundColor: '#2a1a1a', border: '1px solid #ff4444', padding: '20px', borderRadius: '8px', color: '#ff4444', textAlign: 'center' }}>
           {errorMsg}
-          <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: '10px' }}>
-            ※初回はデータ保管用の <code>public/items.json</code> ファイルを作成する必要があります。
-          </p>
         </div>
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
@@ -143,7 +127,6 @@ export default function Home() {
           {filteredItems.map(item => ( 
             <article key={item.id} style={{ backgroundColor: '#1E1E1E', border: '1px solid #333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               
-              {/* アイテム名と基本情報 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
                 <div>
                   <h2 style={{ fontSize: '1.2rem', margin: '0 0 4px 0', color: '#fff' }}>
@@ -160,7 +143,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 交換・隠れ家用途リスト */}
               <div>
                 <h3 style={{ fontSize: '0.9rem', color: '#E2B02B', margin: '0 0 8px 0' }}>用途・交換先</h3>
                 {item.usages && item.usages.length > 0 ? (
