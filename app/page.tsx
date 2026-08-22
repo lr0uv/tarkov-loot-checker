@@ -2,29 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
-type SellFor = {
-  priceRUB: number;
-  vendor: {
-    name: string;
-    normalizedName: string;
-  };
-};
-
-// ★修正: types の定義を復活させました
-type Item = {
-  id: string;
-  name: string | null;
-  shortName: string | null;
-  width: number | null;
-  height: number | null;
-  types: string[] | null;
-  sellFor: SellFor[] | null;
-};
-
-// ★修正: types の定義を復活させました
 type ProcessedItem = {
   id: string;
   name: string;
+  enName: string;
   shortName: string;
   slots: number;
   types: string[];
@@ -38,8 +19,8 @@ type ProcessedItem = {
 type Lang = 'ja' | 'en';
 
 const uiDict = {
-  ja: { searchPlaceholder: "アイテム名で検索 (例: LedX, 砂糖...)", loading: "データを読み込み中...", slot: "マス", valuePerSlot: "1マス価値", flea: "フリマ" },
-  en: { searchPlaceholder: "Search items (e.g. LedX, Sugar...)", loading: "Loading data...", slot: " slots", valuePerSlot: "Value / Slot", flea: "Flea" }
+  ja: { searchPlaceholder: "アイテム名で検索 (例: LedX, 砂糖...)", loading: "市場データを読み込み中...", slot: "マス", valuePerSlot: "1マス価値", flea: "フリマ" },
+  en: { searchPlaceholder: "Search items (e.g. LedX, Sugar...)", loading: "Loading market data...", slot: " slots", valuePerSlot: "Value / Slot", flea: "Flea" }
 };
 
 const CATEGORIES = [
@@ -68,83 +49,29 @@ export default function Home() {
   useEffect(() => {
     if (!isLangLoaded) return;
 
-    const fetchItems = async () => {
+    const fetchLocalData = async () => {
       setLoading(true);
       setErrorMsg(null);
       
       try {
-        const query = `
-          {
-            items(lang: ${lang}) {
-              id
-              name
-              shortName
-              width
-              height
-              types
-              sellFor {
-                priceRUB
-                vendor { name normalizedName }
-              }
-            }
-          }
-        `;
-
-        // 外部のCORSプロキシを経由して通信
-        const response = await fetch('https://corsproxy.io/?https://api.tarkov.dev/graphql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query })
-        });
-
+        // ★API通信をやめ、GitHub Actionsが作ったローカルのJSONを読み込むだけ！
+        const response = await fetch('/items.json');
+        
         if (!response.ok) {
-           const errText = await response.text();
-           throw new Error(`HTTP ${response.status} - ${errText.substring(0, 100)}`);
+           throw new Error("データファイルの読み込みに失敗しました。初回のデータ自動生成待ちの可能性があります。数分後にリロードしてください。");
         }
 
-        const json = await response.json();
-        if (json.errors) throw new Error(json.errors[0].message);
-
-        if (json.data && json.data.items) {
-          const processed = json.data.items.map((item: any) => {
-            const slots = (item.width || 1) * (item.height || 1);
-            let fleaPrice = 0, traderPrice = 0, traderName = '-';
-
-            if (item.sellFor) {
-              item.sellFor.forEach((sell: any) => {
-                if (!sell.vendor) return;
-                if (sell.vendor.normalizedName === 'flea-market') {
-                  fleaPrice = sell.priceRUB || 0;
-                } else if ((sell.priceRUB || 0) > traderPrice) {
-                  traderPrice = sell.priceRUB;
-                  traderName = sell.vendor.name || '-';
-                }
-              });
-            }
-
-            const bestPrice = Math.max(fleaPrice, traderPrice);
-            return {
-              id: item.id || Math.random().toString(),
-              name: item.name || 'Unknown',
-              shortName: item.shortName || 'Unknown',
-              slots,
-              types: item.types || [],
-              fleaPrice, traderPrice, traderName, bestPrice,
-              valuePerSlot: slots > 0 ? Math.floor(bestPrice / slots) : 0
-            };
-          }).filter((item: any) => item.bestPrice > 0); 
-
-          setItems(processed.sort((a: any, b: any) => b.valuePerSlot - a.valuePerSlot));
-        }
+        const data = await response.json();
+        setItems(data);
       } catch (error: any) {
-        console.error("Fetch error:", error);
-        setErrorMsg(`通信エラー: ${error.message}`);
+        console.error("Local fetch error:", error);
+        setErrorMsg(error.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchItems();
+    fetchLocalData();
   }, [lang, isLangLoaded]);
 
   const filteredItems = useMemo(() => {
@@ -155,7 +82,11 @@ export default function Home() {
     }
     if (search) {
       const q = search.toLowerCase();
-      result = result.filter(item => item.name.toLowerCase().includes(q) || item.shortName.toLowerCase().includes(q));
+      result = result.filter(item => 
+        item.name.toLowerCase().includes(q) || 
+        item.enName.toLowerCase().includes(q) ||
+        item.shortName.toLowerCase().includes(q)
+      );
     }
     return result;
   }, [items, search, activeCategory]);
@@ -164,19 +95,23 @@ export default function Home() {
 
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px 20px 40px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '20px' }}>
+        <span style={{ fontSize: '0.9rem', color: '#888', marginRight: '10px' }}>言語:</span>
+        <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} style={{ padding: '5px 10px', backgroundColor: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer' }}>
+          <option value="ja">日本語</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
       <header style={{ marginBottom: '20px' }}>
         <h1 style={{ color: '#E2B02B', fontSize: '1.8rem', margin: '0 0 15px 0' }}>Tarkov Loot Checker</h1>
-        <input 
-          type="text" placeholder={t.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ width: '100%', padding: '12px 15px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }}
-        />
+        <input type="text" placeholder={t.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: '100%', padding: '12px 15px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }} />
       </header>
 
       <section style={{ marginBottom: '30px' }}>
         <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(c => (
-            <button key={c.id} onClick={() => setActiveCategory(c.id)}
-              style={{ padding: '8px 15px', whiteSpace: 'nowrap', backgroundColor: activeCategory === c.id ? '#E2B02B' : '#222', color: activeCategory === c.id ? '#000' : '#fff', border: `1px solid ${activeCategory === c.id ? '#E2B02B' : '#444'}`, borderRadius: '8px', cursor: 'pointer', fontWeight: activeCategory === c.id ? 'bold' : 'normal' }}>
+            <button key={c.id} onClick={() => setActiveCategory(c.id)} style={{ padding: '8px 15px', whiteSpace: 'nowrap', backgroundColor: activeCategory === c.id ? '#E2B02B' : '#222', color: activeCategory === c.id ? '#000' : '#fff', border: `1px solid ${activeCategory === c.id ? '#E2B02B' : '#444'}`, borderRadius: '8px', cursor: 'pointer', fontWeight: activeCategory === c.id ? 'bold' : 'normal' }}>
               {c.icon} {c.label[lang]}
             </button>
           ))}
@@ -184,15 +119,20 @@ export default function Home() {
       </section>
 
       {errorMsg ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#ff4444' }}>{errorMsg}<br/><br/>※アプローチB（根本解決）へ移行する場合はお知らせください。</div>
+        <div style={{ textAlign: 'center', padding: '20px', color: '#ff4444' }}>{errorMsg}</div>
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
+      ) : filteredItems.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>見つかりませんでした。</div>
       ) : (
         <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
           {filteredItems.slice(0, 100).map(item => ( 
             <article key={item.id} style={{ backgroundColor: '#1E1E1E', border: '1px solid #333', borderRadius: '8px', padding: '15px', display: 'flex', flexDirection: 'column' }}>
               <div style={{ marginBottom: '10px' }}>
-                <h2 style={{ fontSize: '1rem', margin: '0 0 5px 0', color: '#fff' }}>{item.name} <span style={{ color: '#888', fontSize: '0.85rem' }}>({item.shortName})</span></h2>
+                <h2 style={{ fontSize: '1rem', margin: '0 0 5px 0', color: '#fff' }}>
+                  {lang === 'ja' ? item.name : item.enName} 
+                  {lang === 'ja' && <span style={{ color: '#888', fontSize: '0.85rem' }}> ({item.enName})</span>}
+                </h2>
                 <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px' }}>{item.slots}{t.slot}</span>
               </div>
               <div style={{ backgroundColor: '#2A2A2A', padding: '10px', borderRadius: '6px', textAlign: 'center', marginBottom: '10px' }}>
