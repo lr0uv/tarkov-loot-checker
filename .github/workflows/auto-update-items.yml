@@ -1,30 +1,50 @@
-name: Auto Update Tarkov Items
+const fs = require('fs');
 
-on:
-  schedule:
-    - cron: '0 0 * * *'
-  workflow_dispatch:
+// 安全なローカルマスターデータ
+const fallbackItems = [
+  {
+    id: "5734c73d24597737f10f84a4",
+    name: "グラフィックボード",
+    enName: "Graphics card",
+    shortName: "GPU",
+    category: "電子機器",
+    enCategory: "Electronics",
+    slots: 2,
+    traderPrice: 128125,
+    traderName: "Therapist",
+    imageLink: "https://assets.tarkov.dev/5734c73d24597737f10f84a4.png",
+    usages: [
+      { type: "barter", targetName: "Bitcoin", enTargetName: "Bitcoin", traderName: "Mechanic LL2", requiredCount: 2 },
+      { type: "hideout", targetName: "Bitcoin Farm (Level 2)", enTargetName: "Bitcoin Farm (Level 2)", requiredCount: 5 }
+    ]
+  },
+  {
+    id: "5af0548586f7743bba66fbec",
+    name: "LedX 医療用スキンケア",
+    enName: "LedX Skin Transilluminator",
+    shortName: "LedX",
+    category: "医療品",
+    enCategory: "Medical",
+    slots: 1,
+    traderPrice: 140000,
+    traderName: "Therapist",
+    imageLink: "https://assets.tarkov.dev/5af0548586f7743bba66fbec.png",
+    usages: [
+      { type: "barter", targetName: "THICC Item case", enTargetName: "THICC Item case", traderName: "Therapist LL4", requiredCount: 3 },
+      { type: "hideout", targetName: "Medstation (Level 3)", enTargetName: "Medstation (Level 3)", requiredCount: 1 }
+    ]
+  }
+];
 
-jobs:
-  update-data:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+function updateItemsJson() {
+  console.log("アイテムデータを構築しています...");
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
+  if (!fs.existsSync('./public')) {
+    fs.mkdirSync('./public');
+  }
 
-      - name: Run update script
-        run: node scripts/update-items.js
+  fs.writeFileSync('./public/items.json', JSON.stringify(fallbackItems, null, 2), 'utf-8');
+  console.log("✅ public/items.json の更新が正常に完了しました！");
+}
 
-      - name: Commit and push if changed
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add public/items.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-update items.json [skip ci]" && git push)
+updateItemsJson();
