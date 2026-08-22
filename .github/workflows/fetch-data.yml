@@ -1,0 +1,87 @@
+name: Fetch Tarkov Data
+
+on:
+  schedule:
+    # 5分ごとに実行（※GitHubの仕様上、多少の遅延は発生します）
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # 手動実行用ボタン
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fetch data from Tarkov.dev
+        run: |
+          # 1. 日本語データを取得 (name, shortName など)
+          curl -s -X POST https://api.tarkov.dev/graphql \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"query": "{ items(lang: ja) { id name shortName width height types sellFor { priceRUB vendor { name normalizedName } } } }"}' > data_ja.json
+          
+          # 2. 英語データを取得 (enName 用)
+          curl -s -X POST https://api.tarkov.dev/graphql \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"query": "{ items(lang: en) { id name } }"}' > data_en.json
+
+          # 3. Node.jsスクリプトでデータを結合し、public/items.json として保存
+          node -e "
+            const fs = require('fs');
+            try {
+              const jaData = JSON.parse(fs.readFileSync('data_ja.json', 'utf8'));
+              const enData = JSON.parse(fs.readFileSync('data_en.json', 'utf8'));
+              
+              if (jaData.errors || enData.errors) {
+                console.error('API Error:', jaData.errors || enData.errors);
+                process.exit(1);
+              }
+              
+              const itemsJa = jaData.data.items;
+              const itemsEn = enData.data.items;
+              
+              const enMap = new Map(itemsEn.map(item => [item.id, item.name]));
+              
+              const processed = itemsJa.map(item => {
+                const slots = (item.width || 1) * (item.height || 1);
+                let fleaPrice = 0, traderPrice = 0, traderName = '-';
+                
+                if (item.sellFor) {
+                  item.sellFor.forEach(sell => {
+                    if (!sell.vendor) return;
+                    if (sell.vendor.normalizedName === 'flea-market') fleaPrice = sell.priceRUB || 0;
+                    else if ((sell.priceRUB || 0) > traderPrice) { traderPrice = sell.priceRUB; traderName = sell.vendor.name || '-'; }
+                  });
+                }
+                
+                const bestPrice = Math.max(fleaPrice, traderPrice);
+                return {
+                  id: item.id || Math.random().toString(),
+                  name: item.name || 'Unknown',
+                  enName: enMap.get(item.id) || 'Unknown',
+                  shortName: item.shortName || 'Unknown',
+                  slots,
+                  types: item.types || [],
+                  fleaPrice, traderPrice, traderName, bestPrice,
+                  valuePerSlot: slots > 0 ? Math.floor(bestPrice / slots) : 0
+                };
+              }).filter(item => item.bestPrice > 0).sort((a, b) => b.valuePerSlot - a.valuePerSlot);
+              
+              if (!fs.existsSync('public')) fs.mkdirSync('public');
+              fs.writeFileSync('public/items.json', JSON.stringify(processed));
+              console.log('Successfully created public/items.json');
+            } catch(e) {
+              console.error('Data processing failed:', e);
+              process.exit(1);
+            }
+          "
+
+      - name: Commit and Push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add public/items.json
+          # 変更がある場合のみコミット
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update Tarkov market data" && git push)
