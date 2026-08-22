@@ -10,20 +10,24 @@ type SellFor = {
   };
 };
 
+// ★修正: types の定義を復活させました
 type Item = {
   id: string;
   name: string | null;
   shortName: string | null;
   width: number | null;
   height: number | null;
+  types: string[] | null;
   sellFor: SellFor[] | null;
 };
 
+// ★修正: types の定義を復活させました
 type ProcessedItem = {
   id: string;
   name: string;
   shortName: string;
   slots: number;
+  types: string[];
   fleaPrice: number;
   traderPrice: number;
   traderName: string;
@@ -86,7 +90,7 @@ export default function Home() {
           }
         `;
 
-        // ★魔法の1行: corsproxyを経由してCORS制限を強行突破する
+        // 外部のCORSプロキシを経由して通信
         const response = await fetch('https://corsproxy.io/?https://api.tarkov.dev/graphql', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -164,12 +168,12 @@ export default function Home() {
         <h1 style={{ color: '#E2B02B', fontSize: '1.8rem', margin: '0 0 15px 0' }}>Tarkov Loot Checker</h1>
         <input 
           type="text" placeholder={t.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)}
-          style={{ width: '100%', padding: '12px 15px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff' }}
+          style={{ width: '100%', padding: '12px 15px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }}
         />
       </header>
 
       <section style={{ marginBottom: '30px' }}>
-        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px' }}>
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'none' }}>
           {CATEGORIES.map(c => (
             <button key={c.id} onClick={() => setActiveCategory(c.id)}
               style={{ padding: '8px 15px', whiteSpace: 'nowrap', backgroundColor: activeCategory === c.id ? '#E2B02B' : '#222', color: activeCategory === c.id ? '#000' : '#fff', border: `1px solid ${activeCategory === c.id ? '#E2B02B' : '#444'}`, borderRadius: '8px', cursor: 'pointer', fontWeight: activeCategory === c.id ? 'bold' : 'normal' }}>
