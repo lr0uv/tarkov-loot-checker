@@ -1,6 +1,5 @@
 import LootCheckerClient from './LootCheckerClient';
 
-// 魔法の1行: ここで「5分(300秒)に1回だけデータを取得・キャッシュする」ようVercelに指示します
 export const revalidate = 300;
 
 type SellFor = {
@@ -18,7 +17,7 @@ type Item = {
   width: number | null;
   height: number | null;
   iconLink: string | null;
-  types: string[];
+  types: string[] | null;
   sellFor: SellFor[] | null;
 };
 
@@ -47,14 +46,13 @@ export default async function Home() {
       }
     `;
 
-    // サーバーサイドでAPIを取得（クライアント側のエラーはここで消滅します）
     const response = await fetch('https://api.tarkov.dev/graphql', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({ query: query }),
+      body: JSON.stringify({ query }),
       next: { revalidate: 300 } 
     });
 
@@ -67,8 +65,8 @@ export default async function Home() {
     if (json.data && json.data.items) {
       const rawItems: Item[] = json.data.items;
       
-      // 1マス価値の計算などをすべてサーバー側で完了させておく
       processedItems = rawItems.map(item => {
+        // Null対策を徹底
         const slots = (item.width || 1) * (item.height || 1);
         let fleaPrice = 0;
         let traderPrice = 0;
@@ -93,10 +91,11 @@ export default async function Home() {
 
         return {
           id: item.id || Math.random().toString(),
-          name: item.name || '',
-          shortName: item.shortName || '',
+          // APIから名前が来なかった場合は 'Unknown Item' を入れる
+          name: item.name || 'Unknown Item',
+          shortName: item.shortName || item.name || 'Unknown',
           slots,
-          iconLink: item.iconLink || '',
+          iconLink: item.iconLink || 'https://via.placeholder.com/50',
           types: item.types || [],
           fleaPrice,
           traderPrice,
@@ -104,16 +103,15 @@ export default async function Home() {
           bestPrice,
           valuePerSlot
         };
-      }).filter(item => item.bestPrice > 0); 
+      }).filter(item => item.bestPrice > 0); // 価値が0のアイテム（売れないもの）だけ弾く
 
       // 1マス価値が高い順にソート
       processedItems.sort((a, b) => b.valuePerSlot - a.valuePerSlot);
     }
   } catch (error) {
     console.error("サーバーでのデータ取得に失敗しました:", error);
-    // 取得に失敗した場合でもサイトはクラッシュせず、前回成功時のキャッシュが表示され続けます
   }
 
-  // サーバー側で計算したデータをクライアント(画面)に渡す
+  // クライアントコンポーネントへ確実にデータを渡す
   return <LootCheckerClient initialItems={processedItems} />;
 }
