@@ -5,6 +5,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 type BarterUsage = {
   type: 'barter' | 'hideout';
   targetName: string;
+  enTargetName: string;
   traderName?: string;
   requiredCount: number;
 };
@@ -31,7 +32,8 @@ const uiDict = {
     noUsage: "現在登録されている交換・隠れ信用途はありません",
     usageBarter: "【交換 (Barter)】",
     usageHideout: "【隠れ家 (Hideout)】",
-    notFound: "一致するアイテムが見つかりませんでした。"
+    usageTitle: "用途・交換先",
+    required: "必要数"
   },
   en: {
     searchPlaceholder: "Search items (e.g. Tape, GPU, LedX...)",
@@ -41,7 +43,8 @@ const uiDict = {
     noUsage: "No barter or hideout usage registered",
     usageBarter: "[Barter]",
     usageHideout: "[Hideout]",
-    notFound: "No items found."
+    usageTitle: "Usages & Barters",
+    required: "Required"
   }
 };
 
@@ -121,7 +124,7 @@ export default function Home() {
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
       ) : filteredItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.notFound}</div>
+        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>No items found.</div>
       ) : (
         <section style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
           {filteredItems.map(item => ( 
@@ -144,24 +147,27 @@ export default function Home() {
               </div>
 
               <div>
-                <h3 style={{ fontSize: '0.9rem', color: '#E2B02B', margin: '0 0 8px 0' }}>用途・交換先</h3>
+                <h3 style={{ fontSize: '0.9rem', color: '#E2B02B', margin: '0 0 8px 0' }}>{t.usageTitle}</h3>
                 {item.usages && item.usages.length > 0 ? (
                   <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {item.usages.map((usage, idx) => (
-                      <li key={idx} style={{ fontSize: '0.9rem', color: '#ddd' }}>
-                        {usage.type === 'barter' ? (
-                          <span>
-                            <strong style={{ color: '#64B5F6' }}>{t.usageBarter}</strong> [{usage.traderName}] 
-                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> を入手 (必要数: {usage.requiredCount}個)
-                          </span>
-                        ) : (
-                          <span>
-                            <strong style={{ color: '#BA68C8' }}>{t.usageHideout}</strong> 
-                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> のアップグレード/クラフト (必要数: {usage.requiredCount}個)
-                          </span>
-                        )}
-                      </li>
-                    ))}
+                    {item.usages.map((usage, idx) => {
+                      const targetName = lang === 'ja' ? usage.targetName : usage.enTargetName;
+                      return (
+                        <li key={idx} style={{ fontSize: '0.9rem', color: '#ddd' }}>
+                          {usage.type === 'barter' ? (
+                            <span>
+                              <strong style={{ color: '#64B5F6' }}>{t.usageBarter}</strong> [{usage.traderName}] 
+                              <span style={{ color: '#fff', fontWeight: 'bold' }}> {targetName}</span> ({t.required}: {usage.requiredCount})
+                            </span>
+                          ) : (
+                            <span>
+                              <strong style={{ color: '#BA68C8' }}>{t.usageHideout}</strong> 
+                              <span style={{ color: '#fff', fontWeight: 'bold' }}> {targetName}</span> ({t.required}: {usage.requiredCount})
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <span style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>{t.noUsage}</span>
