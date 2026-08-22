@@ -25,7 +25,6 @@ type Item = {
 type ProcessedItem = {
   id: string;
   name: string;
-  enName: string;
   shortName: string;
   slots: number;
   iconLink: string;
@@ -57,17 +56,13 @@ const uiDict = {
   }
 };
 
-// カテゴリの定義とAPIのtypesマッピング
+// 【修正】ご指定のカテゴリのみを残しました
 const CATEGORIES = [
   { id: 'all', icon: '🔍', label: { ja: 'すべて', en: 'All' }, types: [] },
   { id: 'medical', icon: '🏥', label: { ja: '医療品', en: 'Medical' }, types: ['medical', 'meds', 'injectors'] },
   { id: 'food', icon: '🍔', label: { ja: '食料品', en: 'Food' }, types: ['provisions'] },
   { id: 'building', icon: '🧱', label: { ja: '建築資材', en: 'Building' }, types: ['barter'] },
-  { id: 'weapon', icon: '🔫', label: { ja: '武器類', en: 'Weapons' }, types: ['gun', 'grenade'] },
-  { id: 'armor', icon: '👕', label: { ja: '防具類', en: 'Armor' }, types: ['armor', 'helmet', 'wearable'] },
-  { id: 'keys', icon: '🗝️', label: { ja: '鍵類', en: 'Keys' }, types: ['keys'] },
   { id: 'valuables', icon: '💎', label: { ja: '貴重品', en: 'Valuables' }, types: ['barter'] },
-  { id: 'container', icon: '🎒', label: { ja: 'コンテナ', en: 'Containers' }, types: ['backpack', 'rig'] },
 ];
 
 export default function Home() {
@@ -88,7 +83,7 @@ export default function Home() {
     setIsLangLoaded(true);
   }, []);
 
-  // データ取得
+  // データ取得（軽量化しFailed to fetchを防止）
   useEffect(() => {
     if (!isLangLoaded) return;
 
@@ -97,14 +92,9 @@ export default function Home() {
       setErrorMsg(null);
       
       try {
-        // 英語データと、現在選択中の言語データを別々のエイリアスで取得するクエリ
         const query = `
           {
-            itemsEn: items(lang: en) {
-              id
-              name
-            }
-            itemsCurrent: items(lang: ${lang}) {
+            items(lang: ${lang}) {
               id
               name
               shortName
@@ -139,18 +129,11 @@ export default function Home() {
         const json = await response.json();
 
         if (json.errors) {
-          console.error("GraphQL Errors:", json.errors);
           throw new Error(json.errors[0].message);
         }
 
-        if (json.data && json.data.itemsCurrent && json.data.itemsEn) {
-          // 英語名の辞書を作成
-          const enNameMap = new Map();
-          json.data.itemsEn.forEach((item: { id: string, name: string }) => {
-            enNameMap.set(item.id, item.name);
-          });
-
-          const rawItems: Item[] = json.data.itemsCurrent;
+        if (json.data && json.data.items) {
+          const rawItems: Item[] = json.data.items;
           
           const processed = rawItems.map(item => {
             const slots = (item.width || 1) * (item.height || 1);
@@ -174,12 +157,10 @@ export default function Home() {
 
             const bestPrice = Math.max(fleaPrice, traderPrice);
             const valuePerSlot = slots > 0 ? Math.floor(bestPrice / slots) : 0;
-            const enName = enNameMap.get(item.id) || item.name || '';
 
             return {
               id: item.id || Math.random().toString(),
               name: item.name || '',
-              enName: enName,
               shortName: item.shortName || '',
               slots,
               iconLink: item.iconLink || '',
@@ -222,7 +203,6 @@ export default function Home() {
       const query = search.toLowerCase();
       result = result.filter(item => {
         return (item.name && item.name.toLowerCase().includes(query)) || 
-               (item.enName && item.enName.toLowerCase().includes(query)) || 
                (item.shortName && item.shortName.toLowerCase().includes(query));
       });
     }
@@ -343,7 +323,8 @@ export default function Home() {
                 </div>
                 <div style={{ overflow: 'hidden' }}>
                   <h2 style={{ fontSize: '1rem', margin: '0 0 5px 0', color: '#fff', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                    {item.name} {lang === 'ja' && item.enName !== item.name && <span style={{ color: '#888', fontSize: '0.85rem' }}>({item.enName})</span>}
+                    {/* 英語名の代わりに、APIが標準で返すshortName(Sugarなど)をカッコ書きに利用 */}
+                    {item.name} {lang === 'ja' && item.shortName && item.shortName !== item.name && <span style={{ color: '#888', fontSize: '0.85rem' }}>({item.shortName})</span>}
                   </h2>
                   <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px' }}>
                     {item.slots}{t.slot}
