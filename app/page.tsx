@@ -88,51 +88,58 @@ export default function Home() {
     setIsLangLoaded(true);
   }, []);
 
-  // データ取得（選択言語と英語を同時に取得して結合）
+  // データ取得
   useEffect(() => {
     if (!isLangLoaded) return;
 
     const fetchItems = async () => {
       setLoading(true);
       setErrorMsg(null);
+      
       try {
+        // 英語データと、現在選択中の言語データを別々のエイリアスで取得するクエリ
+        const query = `
+          {
+            itemsEn: items(lang: en) {
+              id
+              name
+            }
+            itemsCurrent: items(lang: ${lang}) {
+              id
+              name
+              shortName
+              width
+              height
+              iconLink
+              types
+              sellFor {
+                priceRUB
+                vendor {
+                  name
+                  normalizedName
+                }
+              }
+            }
+          }
+        `;
+
         const response = await fetch('https://api.tarkov.dev/graphql', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
-          body: JSON.stringify({
-            query: `
-              {
-                itemsEn: items(lang: en) {
-                  id
-                  name
-                }
-                itemsCurrent: items(lang: ${lang}) {
-                  id
-                  name
-                  shortName
-                  width
-                  height
-                  iconLink
-                  types
-                  sellFor {
-                    priceRUB
-                    vendor {
-                      name
-                      normalizedName
-                    }
-                  }
-                }
-              }
-            `
-          })
+          body: JSON.stringify({ query: query })
         });
+
+        if (!response.ok) {
+           throw new Error(`HTTP Error: ${response.status}`);
+        }
 
         const json = await response.json();
 
         if (json.errors) {
+          console.error("GraphQL Errors:", json.errors);
           throw new Error(json.errors[0].message);
         }
 
@@ -186,10 +193,12 @@ export default function Home() {
           }).filter(item => item.bestPrice > 0); 
 
           setItems(processed.sort((a, b) => b.valuePerSlot - a.valuePerSlot));
+        } else {
+           throw new Error("No data returned from API");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Fetch error:", error);
-        setErrorMsg("APIデータの取得に失敗しました。");
+        setErrorMsg(`APIデータの取得に失敗しました。詳細: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -202,7 +211,6 @@ export default function Home() {
   const filteredItems = useMemo(() => {
     let result = items;
 
-    // カテゴリフィルタ
     if (activeCategory !== 'all') {
       const targetTypes = CATEGORIES.find(c => c.id === activeCategory)?.types || [];
       result = result.filter(item => 
@@ -210,7 +218,6 @@ export default function Home() {
       );
     }
 
-    // 文字検索フィルタ
     if (search) {
       const query = search.toLowerCase();
       result = result.filter(item => {
@@ -270,7 +277,7 @@ export default function Home() {
         />
       </header>
 
-      {/* 3. カテゴリ選択 (縦2マス・横無限スクロール) */}
+      {/* 3. カテゴリ選択 */}
       <section style={{ marginBottom: '30px' }}>
         <div style={{
           display: 'grid',
@@ -279,7 +286,7 @@ export default function Home() {
           gap: '10px',
           overflowX: 'auto',
           paddingBottom: '10px',
-          scrollbarWidth: 'none', // Firefox用スクロールバー非表示
+          scrollbarWidth: 'none',
         }}>
           {CATEGORIES.map(category => (
             <button
@@ -330,7 +337,6 @@ export default function Home() {
               display: 'flex',
               flexDirection: 'column',
             }}>
-              {/* アイテム情報ヘッダ */}
               <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
                 <div style={{ width: '60px', height: '60px', flexShrink: 0, backgroundColor: '#111', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   {item.iconLink && <img src={item.iconLink} alt={item.name} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />}
@@ -345,7 +351,6 @@ export default function Home() {
                 </div>
               </div>
               
-              {/* 1マス価値ハイライト */}
               <div style={{ backgroundColor: '#2A2A2A', padding: '10px', borderRadius: '6px', textAlign: 'center', marginBottom: '10px' }}>
                 <span style={{ fontSize: '0.85rem', color: '#aaa', display: 'block', marginBottom: '4px' }}>【{t.valuePerSlot}】</span>
                 <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#E2B02B' }}>
@@ -353,7 +358,6 @@ export default function Home() {
                 </span>
               </div>
 
-              {/* 価格詳細 */}
               <div style={{ fontSize: '0.9rem', borderTop: '1px dashed #444', paddingTop: '10px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                   <span style={{ color: '#888' }}>- {t.flea}:</span>
