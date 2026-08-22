@@ -108,22 +108,24 @@ export default function Home() {
           }
         `;
 
-        const response = await fetch('https://api.tarkov.dev/graphql', {
+        // ★通信先を外部のTarkov.devから、自前のAPI Proxy (/api/tarkov) に変更
+        const response = await fetch('/api/tarkov', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Accept': 'application/json',
           },
           body: JSON.stringify({ query: query })
         });
 
         if (!response.ok) {
-           // HTTPエラーの場合も生のテキストを取得して表示
-           const errText = await response.text();
-           throw new Error(`HTTP ${response.status}: ${errText.substring(0, 100)}`);
+           throw new Error(`Proxy HTTP Error: ${response.status}`);
         }
 
         const json = await response.json();
+
+        if (json.error) {
+           throw new Error(`API Proxy Error: ${json.error}`);
+        }
 
         if (json.errors) {
           throw new Error(`GraphQL Error: ${json.errors[0].message}`);
@@ -176,8 +178,7 @@ export default function Home() {
         }
       } catch (error: any) {
         console.error("Fetch error:", error);
-        // ★ここが最大の変更点: 真のエラー内容を画面に強制出力します
-        setErrorMsg(`【デバッグ用ログ】詳細: ${error.message} (※CORSエラーの場合は「Failed to fetch」と表示されます)`);
+        setErrorMsg(`API通信エラー: 時間をおいて再試行してください。(${error.message})`);
       } finally {
         setLoading(false);
       }
