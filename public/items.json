@@ -1,177 +1,46 @@
-"use client";
-
-import React, { useState, useEffect, useMemo } from 'react';
-
-type BarterUsage = {
-  type: 'barter' | 'hideout';
-  targetName: string;
-  traderName?: string;
-  requiredCount: number;
-};
-
-type StaticItem = {
-  id: string;
-  name: string;
-  enName: string;
-  shortName: string;
-  slots: number;
-  traderPrice: number;
-  traderName: string;
-  usages: BarterUsage[];
-};
-
-type Lang = 'ja' | 'en';
-
-const uiDict = {
-  ja: {
-    searchPlaceholder: "アイテム名で検索 (例: テーピング、グラボ、LedX...)",
-    loading: "データベースを読み込み中...",
-    slot: "マス",
-    traderPrice: "店売り買取",
-    noUsage: "現在登録されている交換・隠れ信用途はありません",
-    usageBarter: "【交換 (Barter)】",
-    usageHideout: "【隠れ家 (Hideout)】",
-    notFound: "一致するアイテムが見つかりませんでした。"
-  },
-  en: {
-    searchPlaceholder: "Search items (e.g. Tape, GPU, LedX...)",
-    loading: "Loading database...",
-    slot: " slots",
-    traderPrice: "Trader Buy",
-    noUsage: "No barter or hideout usage registered",
-    usageBarter: "[Barter]",
-    usageHideout: "[Hideout]",
-    notFound: "No items found."
-  }
-};
-
-export default function Home() {
-  const [items, setItems] = useState<StaticItem[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [lang, setLang] = useState<Lang>('ja');
-
-  useEffect(() => {
-    const loadLocalData = async () => {
-      setLoading(true);
-      setErrorMsg(null);
-      
-      try {
-        const response = await fetch('/items.json');
-        if (!response.ok) {
-           throw new Error("アイテムデータの読み込みに失敗しました。public/items.json が配置されているか確認してください。");
-        }
-        const data = await response.json();
-        setItems(data);
-      } catch (error: any) {
-        console.error("Data load error:", error);
-        setErrorMsg(error.message);
-      } finally {
-        setLoading(false);
+[
+  {
+    "id": "item_sample_1",
+    "name": "グラフィックボード",
+    "enName": "Graphics card",
+    "shortName": "GPU",
+    "slots": 2,
+    "traderPrice": 128125,
+    "traderName": "Therapist",
+    "usages": [
+      {
+        "type": "barter",
+        "targetName": "Bitcon",
+        "traderName": "Mechanic LL2",
+        "requiredCount": 2
+      },
+      {
+        "type": "hideout",
+        "targetName": "Bitcoin Farm (Level 2)",
+        "requiredCount": 5
       }
-    };
-
-    loadLocalData();
-  }, []);
-
-  const filteredItems = useMemo(() => {
-    if (!search) return items;
-    const q = search.toLowerCase();
-    return items.filter(item => 
-      item.name.toLowerCase().includes(q) || 
-      item.enName.toLowerCase().includes(q) ||
-      item.shortName.toLowerCase().includes(q)
-    );
-  }, [items, search]);
-
-  const t = uiDict[lang];
-
-  return (
-    <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
-      {/* ヘッダー＆言語切り替え */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ color: '#E2B02B', fontSize: '1.6rem', margin: 0 }}>Tarkov Barter & Loot Checker</h1>
-        <select 
-          value={lang} 
-          onChange={(e) => setLang(e.target.value as Lang)} 
-          style={{ padding: '8px 12px', backgroundColor: '#222', color: '#fff', border: '1px solid #555', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem', zIndex: 10, position: 'relative' }}
-        >
-          <option value="ja">日本語</option>
-          <option value="en">English</option>
-        </select>
-      </div>
-
-      {/* 検索バー */}
-      <div style={{ marginBottom: '30px' }}>
-        <input 
-          type="text" 
-          placeholder={t.searchPlaceholder} 
-          value={search} 
-          onChange={(e) => setSearch(e.target.value)} 
-          style={{ width: '100%', padding: '14px 18px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }} 
-        />
-      </div>
-
-      {/* メインコンテンツ */}
-      {errorMsg ? (
-        <div style={{ backgroundColor: '#2a1a1a', border: '1px solid #ff4444', padding: '20px', borderRadius: '8px', color: '#ff4444', textAlign: 'center' }}>
-          {errorMsg}
-        </div>
-      ) : loading ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
-      ) : filteredItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.notFound}</div>
-      ) : (
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-          {filteredItems.map(item => ( 
-            <article key={item.id} style={{ backgroundColor: '#1E1E1E', border: '1px solid #333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
-                <div>
-                  <h2 style={{ fontSize: '1.2rem', margin: '0 0 4px 0', color: '#fff' }}>
-                    {lang === 'ja' ? item.name : item.enName} 
-                    <span style={{ color: '#888', fontSize: '0.9rem', fontWeight: 'normal', marginLeft: '8px' }}>({item.enName})</span>
-                  </h2>
-                  <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: '#2A2A2A', padding: '2px 8px', borderRadius: '4px' }}>
-                    {item.slots} {t.slot}
-                  </span>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>{t.traderPrice} ({item.traderName})</span>
-                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4CAF50' }}>₽{item.traderPrice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div>
-                <h3 style={{ fontSize: '0.9rem', color: '#E2B02B', margin: '0 0 8px 0' }}>用途・交換先</h3>
-                {item.usages && item.usages.length > 0 ? (
-                  <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {item.usages.map((usage, idx) => (
-                      <li key={idx} style={{ fontSize: '0.9rem', color: '#ddd' }}>
-                        {usage.type === 'barter' ? (
-                          <span>
-                            <strong style={{ color: '#64B5F6' }}>{t.usageBarter}</strong> [{usage.traderName}] 
-                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> を入手 (必要数: {usage.requiredCount}個)
-                          </span>
-                        ) : (
-                          <span>
-                            <strong style={{ color: '#BA68C8' }}>{t.usageHideout}</strong> 
-                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> のアップグレード/クラフト (必要数: {usage.requiredCount}個)
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <span style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>{t.noUsage}</span>
-                )}
-              </div>
-
-            </article>
-          ))}
-        </section>
-      )}
-    </main>
-  );
-}
+    ]
+  },
+  {
+    "id": "item_sample_2",
+    "name": "LedX 医療用スキンケア",
+    "enName": "LedX Skin Transilluminator",
+    "shortName": "LedX",
+    "slots": 1,
+    "traderPrice": 140000,
+    "traderName": "Therapist",
+    "usages": [
+      {
+        "type": "barter",
+        "targetName": "THICC Item case",
+        "traderName": "Therapist LL4",
+        "requiredCount": 3
+      },
+      {
+        "type": "hideout",
+        "targetName": "Medstation (Level 3)",
+        "requiredCount": 1
+      }
+    ]
+  }
+]
