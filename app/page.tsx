@@ -87,8 +87,9 @@ export default function Home() {
       setErrorMsg(null);
       
       try {
+        // ★修正: 先頭に 'query' を追加し、GraphQLの正式なフォーマットに準拠
         const query = `
-          {
+          query {
             items(lang: ${lang}) {
               id
               name
@@ -108,7 +109,6 @@ export default function Home() {
           }
         `;
 
-        // ★通信先を外部のTarkov.devから、自前のAPI Proxy (/api/tarkov) に変更
         const response = await fetch('/api/tarkov', {
           method: 'POST',
           headers: {
@@ -118,14 +118,13 @@ export default function Home() {
         });
 
         if (!response.ok) {
-           throw new Error(`Proxy HTTP Error: ${response.status}`);
+           // Proxyから返ってきた真のエラー内容を抽出
+           const errJson = await response.json().catch(() => null);
+           const details = errJson?.error || response.statusText;
+           throw new Error(`Proxy HTTP ${response.status} - ${details}`);
         }
 
         const json = await response.json();
-
-        if (json.error) {
-           throw new Error(`API Proxy Error: ${json.error}`);
-        }
 
         if (json.errors) {
           throw new Error(`GraphQL Error: ${json.errors[0].message}`);
@@ -178,7 +177,8 @@ export default function Home() {
         }
       } catch (error: any) {
         console.error("Fetch error:", error);
-        setErrorMsg(`API通信エラー: 時間をおいて再試行してください。(${error.message})`);
+        // エラーの全貌を画面に表示
+        setErrorMsg(`【デバッグ用】エラー詳細: ${error.message}`);
       } finally {
         setLoading(false);
       }
@@ -290,7 +290,7 @@ export default function Home() {
       </section>
 
       {errorMsg ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#ff4444' }}>{errorMsg}</div>
+        <div style={{ textAlign: 'center', padding: '30px 10px', color: '#ff4444', wordBreak: 'break-all' }}>{errorMsg}</div>
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
       ) : filteredItems.length === 0 ? (
