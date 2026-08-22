@@ -2,39 +2,53 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
-type ProcessedItem = {
+// 交換品やハイドアウトの用途データの型定義
+type BarterUsage = {
+  type: 'barter' | 'hideout';
+  targetName: string; // 交換で手に入るアイテム名、または隠れ家施設名
+  traderName?: string; // トレーダー名 (barterの場合)
+  requiredCount: number; // 必要個数
+};
+
+type StaticItem = {
   id: string;
   name: string;
   enName: string;
   shortName: string;
   slots: number;
-  types: string[];
-  fleaPrice: number;
   traderPrice: number;
   traderName: string;
-  bestPrice: number;
-  valuePerSlot: number;
+  usages: BarterUsage[];
 };
 
 type Lang = 'ja' | 'en';
 
 const uiDict = {
-  ja: { searchPlaceholder: "アイテム名で検索 (例: LedX, 砂糖...)", loading: "市場データを読み込み中...", slot: "マス", valuePerSlot: "1マス価値", flea: "フリマ" },
-  en: { searchPlaceholder: "Search items (e.g. LedX, Sugar...)", loading: "Loading market data...", slot: " slots", valuePerSlot: "Value / Slot", flea: "Flea" }
+  ja: {
+    searchPlaceholder: "アイテム名で検索 (例: テーピング、グラボ、LedX...)",
+    loading: "データベースを読み込み中...",
+    slot: "マス",
+    traderPrice: "店売り買取",
+    noUsage: "現在登録されている交換・隠れ信用途はありません",
+    usageBarter: "【交換 (Barter)】",
+    usageHideout: "【隠れ家 (Hideout)】",
+    notFound: "一致するアイテムが見つかりませんでした。"
+  },
+  en: {
+    searchPlaceholder: "Search items (e.g. Tape, GPU, LedX...)",
+    loading: "Loading database...",
+    slot: " slots",
+    traderPrice: "Trader Buy",
+    noUsage: "No barter or hideout usage registered",
+    usageBarter: "[Barter]",
+    usageHideout: "[Hideout]",
+    notFound: "No items found."
+  }
 };
 
-const CATEGORIES = [
-  { id: 'all', icon: '🔍', label: { ja: 'すべて', en: 'All' }, types: [] },
-  { id: 'medical', icon: '🏥', label: { ja: '医療品', en: 'Medical' }, types: ['medical', 'meds', 'injectors'] },
-  { id: 'food', icon: '🍔', label: { ja: '食料品', en: 'Food' }, types: ['provisions'] },
-  { id: 'building', icon: '🧱', label: { ja: '建築資材', en: 'Building' }, types: ['barter'] },
-  { id: 'valuables', icon: '💎', label: { ja: '貴重品', en: 'Valuables' }, types: ['barter'] },
-];
-
 export default function Home() {
-  const [items, setItems] = useState<ProcessedItem[]>([]);
+  const [items, setItems] = useState<StaticItem[]>([]);
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>('ja');
@@ -49,100 +63,129 @@ export default function Home() {
   useEffect(() => {
     if (!isLangLoaded) return;
 
-    const fetchLocalData = async () => {
+    const loadLocalData = async () => {
       setLoading(true);
       setErrorMsg(null);
       
       try {
-        // ★API通信をやめ、GitHub Actionsが作ったローカルのJSONを読み込むだけ！
+        // 外部APIではなく、ローカルの静的JSONファイルを読み込む（爆速・エラーゼロ）
         const response = await fetch('/items.json');
         
         if (!response.ok) {
-           throw new Error("データファイルの読み込みに失敗しました。初回のデータ自動生成待ちの可能性があります。数分後にリロードしてください。");
+           throw new Error("アイテムデータの読み込みに失敗しました。public/items.json が配置されているか確認してください。");
         }
 
         const data = await response.json();
         setItems(data);
       } catch (error: any) {
-        console.error("Local fetch error:", error);
+        console.error("Data load error:", error);
         setErrorMsg(error.message);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLocalData();
-  }, [lang, isLangLoaded]);
+    loadLocalData();
+  }, [isLangLoaded]);
 
   const filteredItems = useMemo(() => {
-    let result = items;
-    if (activeCategory !== 'all') {
-      const targetTypes = CATEGORIES.find(c => c.id === activeCategory)?.types || [];
-      result = result.filter(item => item.types?.some(type => targetTypes.includes(type)));
-    }
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(item => 
-        item.name.toLowerCase().includes(q) || 
-        item.enName.toLowerCase().includes(q) ||
-        item.shortName.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [items, search, activeCategory]);
+    if (!search) return items;
+    const q = search.toLowerCase();
+    return items.filter(item => 
+      item.name.toLowerCase().includes(q) || 
+      item.enName.toLowerCase().includes(q) ||
+      item.shortName.toLowerCase().includes(q)
+    );
+  }, [items, search]);
 
   const t = uiDict[lang];
 
   return (
-    <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px 20px 40px 20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'center', marginBottom: '20px' }}>
-        <span style={{ fontSize: '0.9rem', color: '#888', marginRight: '10px' }}>言語:</span>
-        <select value={lang} onChange={(e) => setLang(e.target.value as Lang)} style={{ padding: '5px 10px', backgroundColor: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer' }}>
+    <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '20px' }}>
+      {/* ヘッダー＆言語切り替え */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <h1 style={{ color: '#E2B02B', fontSize: '1.6rem', margin: 0 }}>Tarkov Barter & Loot Checker</h1>
+        <select 
+          value={lang} 
+          onChange={(e) => setLang(e.target.value as Lang)} 
+          style={{ padding: '5px 10px', backgroundColor: '#222', color: '#fff', border: '1px solid #444', borderRadius: '4px', cursor: 'pointer' }}
+        >
           <option value="ja">日本語</option>
           <option value="en">English</option>
         </select>
       </div>
 
-      <header style={{ marginBottom: '20px' }}>
-        <h1 style={{ color: '#E2B02B', fontSize: '1.8rem', margin: '0 0 15px 0' }}>Tarkov Loot Checker</h1>
-        <input type="text" placeholder={t.searchPlaceholder} value={search} onChange={(e) => setSearch(e.target.value)} style={{ width: '100%', padding: '12px 15px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }} />
-      </header>
+      {/* 検索バー */}
+      <div style={{ marginBottom: '30px' }}>
+        <input 
+          type="text" 
+          placeholder={t.searchPlaceholder} 
+          value={search} 
+          onChange={(e) => setSearch(e.target.value)} 
+          style={{ width: '100%', padding: '14px 18px', fontSize: '1rem', borderRadius: '8px', border: '1px solid #444', backgroundColor: '#1E1E1E', color: '#fff', outline: 'none' }} 
+        />
+      </div>
 
-      <section style={{ marginBottom: '30px' }}>
-        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '10px', scrollbarWidth: 'none' }}>
-          {CATEGORIES.map(c => (
-            <button key={c.id} onClick={() => setActiveCategory(c.id)} style={{ padding: '8px 15px', whiteSpace: 'nowrap', backgroundColor: activeCategory === c.id ? '#E2B02B' : '#222', color: activeCategory === c.id ? '#000' : '#fff', border: `1px solid ${activeCategory === c.id ? '#E2B02B' : '#444'}`, borderRadius: '8px', cursor: 'pointer', fontWeight: activeCategory === c.id ? 'bold' : 'normal' }}>
-              {c.icon} {c.label[lang]}
-            </button>
-          ))}
-        </div>
-      </section>
-
+      {/* メインコンテンツ */}
       {errorMsg ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: '#ff4444' }}>{errorMsg}</div>
+        <div style={{ backgroundColor: '#2a1a1a', border: '1px solid #ff4444', padding: '20px', borderRadius: '8px', color: '#ff4444', textAlign: 'center' }}>
+          {errorMsg}
+          <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: '10px' }}>
+            ※初回はデータ保管用の <code>public/items.json</code> ファイルを作成する必要があります。
+          </p>
+        </div>
       ) : loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.loading}</div>
       ) : filteredItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>見つかりませんでした。</div>
+        <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>{t.notFound}</div>
       ) : (
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '15px' }}>
-          {filteredItems.slice(0, 100).map(item => ( 
-            <article key={item.id} style={{ backgroundColor: '#1E1E1E', border: '1px solid #333', borderRadius: '8px', padding: '15px', display: 'flex', flexDirection: 'column' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <h2 style={{ fontSize: '1rem', margin: '0 0 5px 0', color: '#fff' }}>
-                  {lang === 'ja' ? item.name : item.enName} 
-                  {lang === 'ja' && <span style={{ color: '#888', fontSize: '0.85rem' }}> ({item.enName})</span>}
-                </h2>
-                <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px' }}>{item.slots}{t.slot}</span>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+          {filteredItems.map(item => ( 
+            <article key={item.id} style={{ backgroundColor: '#1E1E1E', border: '1px solid #333', borderRadius: '8px', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              
+              {/* アイテム名と基本情報 */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid #333', paddingBottom: '10px' }}>
+                <div>
+                  <h2 style={{ fontSize: '1.2rem', margin: '0 0 4px 0', color: '#fff' }}>
+                    {lang === 'ja' ? item.name : item.enName} 
+                    <span style={{ color: '#888', fontSize: '0.9rem', fontWeight: 'normal', marginLeft: '8px' }}>({item.enName})</span>
+                  </h2>
+                  <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: '#2A2A2A', padding: '2px 8px', borderRadius: '4px' }}>
+                    {item.slots} {t.slot}
+                  </span>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#888', display: 'block' }}>{t.traderPrice} ({item.traderName})</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#4CAF50' }}>₽{item.traderPrice.toLocaleString()}</span>
+                </div>
               </div>
-              <div style={{ backgroundColor: '#2A2A2A', padding: '10px', borderRadius: '6px', textAlign: 'center', marginBottom: '10px' }}>
-                <span style={{ fontSize: '0.85rem', color: '#aaa', display: 'block' }}>【{t.valuePerSlot}】</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 'bold', color: '#E2B02B' }}>₽{item.valuePerSlot.toLocaleString()}</span>
+
+              {/* 交換・隠れ家用途リスト */}
+              <div>
+                <h3 style={{ fontSize: '0.9rem', color: '#E2B02B', margin: '0 0 8px 0' }}>用途・交換先</h3>
+                {item.usages && item.usages.length > 0 ? (
+                  <ul style={{ margin: 0, paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {item.usages.map((usage, idx) => (
+                      <li key={idx} style={{ fontSize: '0.9rem', color: '#ddd' }}>
+                        {usage.type === 'barter' ? (
+                          <span>
+                            <strong style={{ color: '#64B5F6' }}>{t.usageBarter}</strong> [{usage.traderName}] 
+                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> を入手 (必要数: {usage.requiredCount}個)
+                          </span>
+                        ) : (
+                          <span>
+                            <strong style={{ color: '#BA68C8' }}>{t.usageHideout}</strong> 
+                            <span style={{ color: '#fff', fontWeight: 'bold' }}> {usage.targetName}</span> のアップグレード/クラフト (必要数: {usage.requiredCount}個)
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span style={{ fontSize: '0.85rem', color: '#666', fontStyle: 'italic' }}>{t.noUsage}</span>
+                )}
               </div>
-              <div style={{ fontSize: '0.9rem', borderTop: '1px dashed #444', paddingTop: '10px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}><span style={{ color: '#888' }}>- {t.flea}:</span><span style={{ color: '#4CAF50' }}>₽{item.fleaPrice.toLocaleString()}</span></div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ color: '#888' }}>- {item.traderName}:</span><span style={{ color: '#fff' }}>₽{item.traderPrice.toLocaleString()}</span></div>
-              </div>
+
             </article>
           ))}
         </section>
