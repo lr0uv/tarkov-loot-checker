@@ -1,0 +1,37 @@
+name: ETL Micro-batch Test
+
+on:
+  workflow_dispatch: # 手動実行専用
+
+jobs:
+  test-fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test Tarkov.dev API (Limit: 5)
+        run: |
+          echo "Tarkov.devから5件だけデータを要求します..."
+          
+          # curlで5件だけ取得し、HTTPステータスとレスポンスの中身を取得
+          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" -X POST https://api.tarkov.dev/graphql \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" \
+            -d '{"query": "{ items(limit: 5, lang: ja) { id name shortName } }"}')
+
+          echo "HTTPステータスコード: $HTTP_STATUS"
+          echo "--- レスポンスの中身 ---"
+          cat response.txt
+          echo ""
+          echo "------------------------"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ 取得失敗: Cloudflareのブロックまたはサーバーエラーです。"
+            exit 1
+          fi
+
+          if grep -q '"errors"' response.txt; then
+            echo "❌ GraphQLエラー: サーバーが要求を拒否しました。"
+            exit 1
+          fi
+
+          echo "✅ 取得成功！IPバンはされておらず、分割取得パイプラインが構築可能です！"
