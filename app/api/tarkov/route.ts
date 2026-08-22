@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-// 魔法の1行: Vercelの通常サーバーではなく、Cloudflareと同じ「Edgeネットワーク」から通信させる
 export const runtime = 'edge';
 
 export async function POST(request: Request) {
@@ -12,16 +11,16 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        // 偽装は逆効果になるため削除し、専用ツールとして正直に名乗ります
-        'User-Agent': 'TarkovLootChecker/1.0 (Edge Proxy)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       body: JSON.stringify(body),
     });
 
     if (!response.ok) {
+      // Tarkov.devが返してきた「真のエラーメッセージ」を抽出してクライアントに送る
       const errText = await response.text();
       console.error("Tarkov API HTTP Error:", response.status, errText);
-      return NextResponse.json({ error: `HTTP ${response.status} - Cloudflare Blocked` }, { status: response.status });
+      return NextResponse.json({ error: errText.substring(0, 500) }, { status: response.status });
     }
 
     const data = await response.json();
@@ -29,6 +28,6 @@ export async function POST(request: Request) {
     
   } catch (error: any) {
     console.error("Proxy API Error:", error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
