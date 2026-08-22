@@ -4,13 +4,16 @@
     "name": "グラフィックボード",
     "enName": "Graphics card",
     "shortName": "GPU",
+    "category": "電子機器",
+    "enCategory": "Electronics",
     "slots": 2,
     "traderPrice": 128125,
     "traderName": "Therapist",
+    "imageLink": "https://assets.tarkov.dev/5734c73d24597737f10f84a4.png",
     "usages": [
       {
         "type": "barter",
-        "targetName": "Bitcon",
+        "targetName": "Bitcoin",
         "enTargetName": "Bitcoin",
         "traderName": "Mechanic LL2",
         "requiredCount": 2
@@ -28,9 +31,12 @@
     "name": "LedX 医療用スキンケア",
     "enName": "LedX Skin Transilluminator",
     "shortName": "LedX",
+    "category": "医療品",
+    "enCategory": "Medical",
     "slots": 1,
     "traderPrice": 140000,
     "traderName": "Therapist",
+    "imageLink": "https://assets.tarkov.dev/5af0548586f7743bba66fbec.png",
     "usages": [
       {
         "type": "barter",
