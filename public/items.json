@@ -11,12 +11,14 @@
       {
         "type": "barter",
         "targetName": "Bitcon",
+        "enTargetName": "Bitcoin",
         "traderName": "Mechanic LL2",
         "requiredCount": 2
       },
       {
         "type": "hideout",
         "targetName": "Bitcoin Farm (Level 2)",
+        "enTargetName": "Bitcoin Farm (Level 2)",
         "requiredCount": 5
       }
     ]
@@ -33,12 +35,14 @@
       {
         "type": "barter",
         "targetName": "THICC Item case",
+        "enTargetName": "THICC Item case",
         "traderName": "Therapist LL4",
         "requiredCount": 3
       },
       {
         "type": "hideout",
         "targetName": "Medstation (Level 3)",
+        "enTargetName": "Medstation (Level 3)",
         "requiredCount": 1
       }
     ]
