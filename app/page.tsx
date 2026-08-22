@@ -71,7 +71,6 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>('ja');
   const [isLangLoaded, setIsLangLoaded] = useState(false);
 
-  // ブラウザ言語の初期判定
   useEffect(() => {
     const browserLang = navigator.language.toLowerCase();
     if (!browserLang.startsWith('ja')) {
@@ -80,7 +79,6 @@ export default function Home() {
     setIsLangLoaded(true);
   }, []);
 
-  // 軽量化されたクエリでブラウザから直接データを取得
   useEffect(() => {
     if (!isLangLoaded) return;
 
@@ -120,13 +118,15 @@ export default function Home() {
         });
 
         if (!response.ok) {
-           throw new Error(`HTTP Error: ${response.status}`);
+           // HTTPエラーの場合も生のテキストを取得して表示
+           const errText = await response.text();
+           throw new Error(`HTTP ${response.status}: ${errText.substring(0, 100)}`);
         }
 
         const json = await response.json();
 
         if (json.errors) {
-          throw new Error(json.errors[0].message);
+          throw new Error(`GraphQL Error: ${json.errors[0].message}`);
         }
 
         if (json.data && json.data.items) {
@@ -172,11 +172,12 @@ export default function Home() {
 
           setItems(processed.sort((a, b) => b.valuePerSlot - a.valuePerSlot));
         } else {
-           throw new Error("No data returned from API");
+           throw new Error("APIからデータが空で返却されました。");
         }
       } catch (error: any) {
         console.error("Fetch error:", error);
-        setErrorMsg(`API通信エラー: 時間をおいて再試行してください。`);
+        // ★ここが最大の変更点: 真のエラー内容を画面に強制出力します
+        setErrorMsg(`【デバッグ用ログ】詳細: ${error.message} (※CORSエラーの場合は「Failed to fetch」と表示されます)`);
       } finally {
         setLoading(false);
       }
@@ -185,7 +186,6 @@ export default function Home() {
     fetchItems();
   }, [lang, isLangLoaded]);
 
-  // 検索とカテゴリのクロスフィルター
   const filteredItems = useMemo(() => {
     let result = items;
 
