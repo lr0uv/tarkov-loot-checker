@@ -1,0 +1,46 @@
+[
+  {
+    "id": "item_sample_1",
+    "name": "グラフィックボード",
+    "enName": "Graphics card",
+    "shortName": "GPU",
+    "slots": 2,
+    "traderPrice": 128125,
+    "traderName": "Therapist",
+    "usages": [
+      {
+        "type": "barter",
+        "targetName": "Bitcon",
+        "traderName": "Mechanic LL2",
+        "requiredCount": 2
+      },
+      {
+        "type": "hideout",
+        "targetName": "Bitcoin Farm (Level 2)",
+        "requiredCount": 5
+      }
+    ]
+  },
+  {
+    "id": "item_sample_2",
+    "name": "LedX 医療用スキンケア",
+    "enName": "LedX Skin Transilluminator",
+    "shortName": "LedX",
+    "slots": 1,
+    "traderPrice": 140000,
+    "traderName": "Therapist",
+    "usages": [
+      {
+        "type": "barter",
+        "targetName": "THICC Item case",
+        "traderName": "Therapist LL4",
+        "requiredCount": 3
+      },
+      {
+        "type": "hideout",
+        "targetName": "Medstation (Level 3)",
+        "requiredCount": 1
+      }
+    ]
+  }
+]
