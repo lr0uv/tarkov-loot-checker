@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 
-// APIから取得するデータの型定義
+// データ型の定義
 type SellFor = {
   priceRUB: number;
   vendor: {
@@ -34,14 +34,54 @@ type ProcessedItem = {
   valuePerSlot: number;
 };
 
+// UIテキストの多言語辞書
+const uiDict = {
+  ja: {
+    title: "Tarkov Loot Checker",
+    desc: "アイテムの価値・フリマ価格・トレーダー価格を比較して、最高効率のレイドを目指そう。",
+    searchPlaceholder: "アイテム名で検索 (例: LedX, 砂糖...)",
+    loading: "データを読み込み中... (API Fetching)",
+    slot: "マス",
+    valuePerSlot: "1マス価値",
+    flea: "フリマ",
+    footer: "※データは tarkov.dev API を使用しています。パフォーマンス維持のため上位100件を表示。"
+  },
+  en: {
+    title: "Tarkov Loot Checker",
+    desc: "Compare item values, flea market, and trader prices for maximum raid efficiency.",
+    searchPlaceholder: "Search items (e.g. LedX, Sugar...)",
+    loading: "Loading data... (API Fetching)",
+    slot: " slots",
+    valuePerSlot: "Value / Slot",
+    flea: "Flea",
+    footer: "*Data provided by tarkov.dev API. Showing top 100 items for performance."
+  }
+};
+
+type Lang = 'ja' | 'en';
+
 export default function Home() {
   const [items, setItems] = useState<ProcessedItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [lang, setLang] = useState<Lang>('en'); // 初期値は英語
+  const [isLangLoaded, setIsLangLoaded] = useState(false);
 
-  // 初回読み込み時にTarkovのAPIからデータを取得
+  // 1. 初回アクセス時にブラウザの言語を自動判定
   useEffect(() => {
+    const browserLang = navigator.language.toLowerCase();
+    if (browserLang.startsWith('ja')) {
+      setLang('ja');
+    }
+    setIsLangLoaded(true);
+  }, []);
+
+  // 2. 言語が決定、または手動で変更されたらAPIからその言語のデータを取得
+  useEffect(() => {
+    if (!isLangLoaded) return;
+
     const fetchItems = async () => {
+      setLoading(true);
       try {
         const response = await fetch('https://api.tarkov.dev/graphql', {
           method: 'POST',
@@ -52,7 +92,7 @@ export default function Home() {
           body: JSON.stringify({
             query: `
               {
-                items(lang: ja) {
+                items(lang: ${lang}) {
                   id
                   name
                   shortName
@@ -76,7 +116,6 @@ export default function Home() {
         if (json.data && json.data.items) {
           const rawItems: Item[] = json.data.items;
           
-          // 価格や1マスあたりの価値を計算
           const processed = rawItems.map(item => {
             const slots = item.width * item.height;
             let fleaPrice = 0;
@@ -94,7 +133,6 @@ export default function Home() {
               }
             });
 
-            // 一番高く売れる価格をベースに1マスあたりの価値を算出
             const bestPrice = Math.max(fleaPrice, traderPrice);
             const valuePerSlot = slots > 0 ? Math.floor(bestPrice / slots) : 0;
 
@@ -112,18 +150,17 @@ export default function Home() {
             };
           }).filter(item => item.bestPrice > 0); 
 
-          // 1マス価値が高い順にソートして保存
           setItems(processed.sort((a, b) => b.valuePerSlot - a.valuePerSlot));
         }
       } catch (error) {
-        console.error("データの取得に失敗しました:", error);
+        console.error("Fetch error:", error);
       } finally {
         setLoading(false);
       }
     };
 
     fetchItems();
-  }, []);
+  }, [lang, isLangLoaded]);
 
   // 検索フィルター
   const filteredItems = useMemo(() => {
@@ -133,20 +170,39 @@ export default function Home() {
     );
   }, [items, search]);
 
+  const t = uiDict[lang];
+
   return (
     <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
+      
+      {/* 言語切り替えスイッチ */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+        <select 
+          value={lang} 
+          onChange={(e) => setLang(e.target.value as Lang)}
+          style={{
+            padding: '5px 10px',
+            backgroundColor: '#333',
+            color: '#fff',
+            border: '1px solid #555',
+            borderRadius: '4px',
+            cursor: 'pointer'
+          }}
+        >
+          <option value="en">English</option>
+          <option value="ja">日本語</option>
+        </select>
+      </div>
+
       <header style={{ textAlign: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: '#E2B02B', fontSize: '2rem', margin: '0 0 10px 0' }}>Tarkov Loot Checker</h1>
-        <p style={{ color: '#A0A0A0', fontSize: '0.9rem', margin: 0 }}>
-          アイテムの価値・フリマ価格・トレーダー価格を比較して、最高効率のレイドを目指そう。
-        </p>
+        <h1 style={{ color: '#E2B02B', fontSize: '2rem', margin: '0 0 10px 0' }}>{t.title}</h1>
+        <p style={{ color: '#A0A0A0', fontSize: '0.9rem', margin: 0 }}>{t.desc}</p>
       </header>
 
-      {/* 検索バー */}
       <section style={{ marginBottom: '20px' }}>
         <input 
           type="text" 
-          placeholder="アイテム名で検索 (例: LedX, 砂糖...)" 
+          placeholder={t.searchPlaceholder} 
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={{
@@ -162,10 +218,9 @@ export default function Home() {
         />
       </section>
 
-      {/* アイテム一覧 */}
       {loading ? (
         <div style={{ textAlign: 'center', padding: '50px', color: '#888' }}>
-          データを読み込み中... (API Fetching)
+          {t.loading}
         </div>
       ) : (
         <section style={{ 
@@ -188,21 +243,21 @@ export default function Home() {
                 <div>
                   <h2 style={{ fontSize: '1.1rem', margin: '0 0 5px 0', color: '#fff' }}>{item.shortName}</h2>
                   <span style={{ fontSize: '0.8rem', color: '#888', backgroundColor: '#333', padding: '2px 6px', borderRadius: '4px' }}>
-                    {item.slots}マス
+                    {item.slots}{t.slot}
                   </span>
                 </div>
               </div>
               
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #333', paddingTop: '10px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#aaa' }}>1マス価値</span>
+                  <span style={{ fontSize: '0.8rem', color: '#aaa' }}>{t.valuePerSlot}</span>
                   <span style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#E2B02B' }}>
                     ₽{item.valuePerSlot.toLocaleString()}
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', fontSize: '0.9rem' }}>
                   <span style={{ color: item.fleaPrice >= item.traderPrice ? '#4CAF50' : '#888' }}>
-                    フリマ: ₽{item.fleaPrice.toLocaleString()}
+                    {t.flea}: ₽{item.fleaPrice.toLocaleString()}
                   </span>
                   <span style={{ color: item.traderPrice > item.fleaPrice ? '#4CAF50' : '#888' }}>
                     {item.traderName}: ₽{item.traderPrice.toLocaleString()}
@@ -214,7 +269,7 @@ export default function Home() {
         </section>
       )}
       <footer style={{ marginTop: '40px', textAlign: 'center', color: '#666', fontSize: '0.8rem' }}>
-        ※データは tarkov.dev API を使用しています。パフォーマンス維持のため上位100件を表示。
+        {t.footer}
       </footer>
     </main>
   );
