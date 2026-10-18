@@ -99,7 +99,9 @@ async function buildMode(srcMode) {
       i: (it.iconLink || '').replace(ICON_PREFIX, ''),
       f: it.lastLowPrice || 0,
       a: it.avg24hPrice || 0,
+      w: (it.width || 1) * (it.height || 1), // インベントリで占めるマス数
     };
+    if (it.minLevelForFlea) row.ml = it.minLevelForFlea; // フリマに出品できるプレイヤーレベル
     if ((it.types || []).includes('noFlea')) row.nf = 1;
     if (best) row.t = [traderName(best.trader), best.priceRUB || 0];
     if (taskUses.has(it.id)) row.u = taskUses.get(it.id);
