@@ -33,6 +33,10 @@ jobs:
             git --work-tree=out checkout FETCH_HEAD -- . || true
           fi
 
+      - name: Probe json.tarkov.dev
+        continue-on-error: true
+        run: node scripts/probe-json.mjs
+
       - name: Build data
         run: node scripts/build-data.mjs out
 
