@@ -36,8 +36,14 @@ button, select, input { font: inherit; color: inherit; }
 .top { border-bottom: 1px solid var(--line); }
 .top-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; height: 56px; }
 .logo { color: var(--text); text-decoration: none; font-weight: 700; font-size: 1.1rem; letter-spacing: .02em; white-space: nowrap; }
+.logo { display: flex; align-items: center; gap: 8px; }
+.logo b { font-weight: inherit; }
 .logo span { color: var(--accent); }
+.mark { flex: none; width: 26px; height: 26px; border-radius: 6px; background: var(--accent); color: var(--bg); font-style: normal; font-weight: 800; display: grid; place-items: center; font-size: .95rem; }
 
+.top-right { display: flex; align-items: center; gap: 8px; }
+.lang { border: 1px solid var(--line); background: none; border-radius: 8px; padding: 5px 10px; cursor: pointer; color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.lang:hover { color: var(--text); border-color: var(--muted); }
 .modes { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
 .mode { border: 0; background: none; padding: 5px 12px; border-radius: 7px; cursor: pointer; color: var(--muted); font-weight: 600; font-size: .9rem; }
 .mode[aria-selected="true"] { background: var(--accent); color: var(--bg); }
@@ -114,6 +120,12 @@ details.more-info[open] summary::before { content: "－ "; }
   .top-inner { height: 52px; }
   .logo { font-size: 1rem; }
   .mode { padding: 4px 9px; font-size: .84rem; }
+  .top-right { gap: 6px; }
+  .lang { padding: 4px 7px; font-size: .78rem; }
+}
+/* 幅が狭いスマホでは、ロゴを「T」の印だけにして、モード切替と言語ボタンが収まるようにする */
+@media (max-width: 440px) {
+  .logo b { display: none; }
   .search kbd { display: none; }
   .row { grid-template-columns: 44px 1fr; }
   .icon { width: 44px; height: 44px; }

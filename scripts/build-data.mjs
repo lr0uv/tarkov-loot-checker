@@ -29,7 +29,7 @@ const getOptional = path => get(path).catch(e => {
 });
 
 async function buildMode(srcMode) {
-  const [items, itemsJa, itemsEn, tasks, tasksJa, tasksEn, hideout, hideoutJa, traders, tradersJa] = await Promise.all([
+  const [items, itemsJa, itemsEn, tasks, tasksJa, tasksEn, hideout, hideoutJa, hideoutEn, traders, tradersJa, tradersEn] = await Promise.all([
     get(`${srcMode}/items`),
     getOptional(`${srcMode}/items_ja`),
     getOptional(`${srcMode}/items_en`),
@@ -38,13 +38,17 @@ async function buildMode(srcMode) {
     getOptional(`${srcMode}/tasks_en`),
     getOptional(`${srcMode}/hideout`),
     getOptional(`${srcMode}/hideout_ja`),
+    getOptional(`${srcMode}/hideout_en`),
     getOptional(`${srcMode}/traders`),
     getOptional(`${srcMode}/traders_ja`),
+    getOptional(`${srcMode}/traders_en`),
   ]);
 
   // 名前は「キー」で入っているので、日本語→英語→キーそのものの順で引く
   const ja = (dict, key, fallback = {}) => dict[key] ?? fallback[key] ?? key;
-  const traderName = id => (traders[id] ? ja(tradersJa, traders[id].name) : '');
+  const en = (dict, key) => dict[key] ?? key;
+  const traderName = id => (traders[id] ? ja(tradersJa, traders[id].name, tradersEn) : '');
+  const traderNameEn = id => (traders[id] ? en(tradersEn, traders[id].name) : '');
 
   // タスク：手渡し(giveItem)と設置(plantItem)だけ数える。findItem は giveItem と重複するため除外
   const taskList = [];
@@ -53,7 +57,9 @@ async function buildMode(srcMode) {
     const idx = taskList.length;
     taskList.push({
       n: ja(tasksJa, t.name, tasksEn),
+      ne: en(tasksEn, t.name),
       tr: traderName(t.trader),
+      tre: traderNameEn(t.trader),
       k: t.kappaRequired ? 1 : 0,
       lk: t.lightkeeperRequired ? 1 : 0,
     });
@@ -76,12 +82,14 @@ async function buildMode(srcMode) {
 
   // ハイドアウト：施設とレベルごとの必要アイテム
   const hideoutList = [];
+  const hideoutListEn = []; // 英語表示用（hideoutList と同じ順番）
   const hideoutUses = new Map(); // itemId -> [[hideoutIndex, count, fir]]
   for (const st of Object.values(hideout || {})) {
     for (const lv of st.levels || []) {
       if (!(lv.itemRequirements || []).length) continue;
       const idx = hideoutList.length;
-      hideoutList.push(`${ja(hideoutJa, st.name)} Lv${lv.level}`);
+      hideoutList.push(`${ja(hideoutJa, st.name, hideoutEn)} Lv${lv.level}`);
+      hideoutListEn.push(`${en(hideoutEn, st.name)} Lv${lv.level}`);
       for (const r of lv.itemRequirements) {
         if (!hideoutUses.has(r.item)) hideoutUses.set(r.item, []);
         hideoutUses.get(r.item).push([idx, r.count || 1, r.attributes?.foundInRaid ? 1 : 0]);
@@ -96,6 +104,7 @@ async function buildMode(srcMode) {
       n: ja(itemsJa, it.name, itemsEn),
       e: itemsEn[it.name] ?? '',
       s: ja(itemsJa, it.shortName, itemsEn),
+      se: itemsEn[it.shortName] ?? '',
       i: (it.iconLink || '').replace(ICON_PREFIX, ''),
       f: it.lastLowPrice || 0,
       a: it.avg24hPrice || 0,
@@ -103,7 +112,7 @@ async function buildMode(srcMode) {
     };
     if (it.minLevelForFlea) row.ml = it.minLevelForFlea; // フリマに出品できるプレイヤーレベル
     if ((it.types || []).includes('noFlea')) row.nf = 1;
-    if (best) row.t = [traderName(best.trader), best.priceRUB || 0];
+    if (best) row.t = [traderName(best.trader), best.priceRUB || 0, traderNameEn(best.trader)];
     if (taskUses.has(it.id)) row.u = taskUses.get(it.id);
     if (hideoutUses.has(it.id)) row.h = hideoutUses.get(it.id);
     return row;
@@ -117,6 +126,7 @@ async function buildMode(srcMode) {
     iconPrefix: ICON_PREFIX,
     tasks: taskList,
     hideout: hideoutList,
+    hideoutEn: hideoutListEn,
     items: rows,
   };
 }

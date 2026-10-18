@@ -4,6 +4,8 @@ https://tarkov-loot-checker.com
 
 Escape from Tarkov のアイテムを検索して、フリマ価格（PvP / PvE）と、Kappa・タスク・ハイドアウトで必要かどうかを表示するサイトです。
 
+表示は日本語と英語に対応しています。ブラウザの言語設定が日本語なら日本語、それ以外は英語で表示し、右上のボタンで切り替えられます（`?lang=ja` / `?lang=en` でも指定できます）。
+
 ## 仕組み
 
 1. GitHub Actions（`.github/workflows/update-data.yml`）が5分ごとに `scripts/build-data.mjs` を実行し、[tarkov.dev](https://tarkov.dev) から価格・タスク・ハイドアウトのデータを取得します。
