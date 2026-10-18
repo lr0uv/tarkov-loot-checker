@@ -64,9 +64,16 @@ async function buildMode(srcMode) {
   // タスク：手渡し(giveItem)と設置(plantItem)だけ数える。findItem は giveItem と重複するため除外
   const taskList = [];
   const taskUses = new Map(); // itemId -> [[taskIndex, count, fir]]
-  for (const t of Object.values(tasks.tasks || {})) {
+  const allTasks = Object.values(tasks.tasks || {});
+  const taskIndex = new Map(allTasks.map((t, i) => [t.id, i]));
+  for (const t of allTasks) {
     const idx = taskList.length;
+    // 前提タスク（これを終えないと受けられないタスク）。「このタスクまで完了」をまとめてチェックするのに使う
+    const pre = (t.taskRequirements || []).map(r => taskIndex.get(r.task?.id ?? r.task)).filter(i => i !== undefined);
     taskList.push({
+      id: t.id,
+      ...(pre.length ? { pre } : {}),
+      ...(t.minPlayerLevel ? { lv: t.minPlayerLevel } : {}),
       n: ja(tasksJa, t.name, tasksEn),
       ne: en(tasksEn, t.name),
       tr: traderName(t.trader),
@@ -94,6 +101,7 @@ async function buildMode(srcMode) {
   // ハイドアウト：施設とレベルごとの必要アイテム
   const hideoutList = [];
   const hideoutListEn = []; // 英語表示用（hideoutList と同じ順番）
+  const hideoutKeys = []; // 進捗の保存用に「施設ID:レベル」（hideoutList と同じ順番）
   const hideoutUses = new Map(); // itemId -> [[hideoutIndex, count, fir]]
   for (const st of Object.values(hideout || {})) {
     for (const lv of st.levels || []) {
@@ -101,6 +109,7 @@ async function buildMode(srcMode) {
       const idx = hideoutList.length;
       hideoutList.push(`${ja(hideoutJa, st.name, hideoutEn)} Lv${lv.level}`);
       hideoutListEn.push(`${en(hideoutEn, st.name)} Lv${lv.level}`);
+      hideoutKeys.push(`${st.id}:${lv.level}`);
       for (const r of lv.itemRequirements) {
         if (!hideoutUses.has(r.item)) hideoutUses.set(r.item, []);
         hideoutUses.get(r.item).push([idx, r.count || 1, r.attributes?.foundInRaid ? 1 : 0]);
@@ -121,6 +130,7 @@ async function buildMode(srcMode) {
       a: it.avg24hPrice || 0,
       w: (it.width || 1) * (it.height || 1), // インベントリで占めるマス数
     };
+    if (it.basePrice) row.bp = it.basePrice; // フリマ手数料の計算に使う基本価格
     if (it.minLevelForFlea) row.ml = it.minLevelForFlea; // フリマに出品できるプレイヤーレベル
     if ((it.types || []).includes('noFlea')) row.nf = 1;
     if (best) row.t = [traderName(best.trader), best.priceRUB || 0, traderNameEn(best.trader)];
@@ -128,6 +138,15 @@ async function buildMode(srcMode) {
     if (hideoutUses.has(it.id)) row.h = hideoutUses.get(it.id);
     return row;
   });
+
+  // 元データの形が変わったときに気づけるよう、項目名を記録しておく
+  const firstTask = allTasks[0] || {};
+  status.shape = {
+    task: Object.keys(firstTask),
+    taskRequirement: firstTask.taskRequirements?.[0] ?? null,
+    item: Object.keys(Object.values(items.items || {})[0] || {}),
+    station: Object.keys(Object.values(hideout || {})[0] || {}),
+  };
 
   const lastScan = Object.values(items.items || {}).reduce((m, it) => (it.lastScan > m ? it.lastScan : m), '');
   return {
@@ -138,6 +157,7 @@ async function buildMode(srcMode) {
     tasks: taskList,
     hideout: hideoutList,
     hideoutEn: hideoutListEn,
+    hideoutKeys,
     items: rows,
   };
 }
