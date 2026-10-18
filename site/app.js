@@ -3,17 +3,17 @@
 // GitHub の data ブランチに置いている。このページはそのファイルを読んで、ブラウザの中で検索するだけ。
 
 const DATA_BASE = 'https://raw.githubusercontent.com/lr0uv/tarkov-loot-checker/data/';
-const MAX_RESULTS = 50;
+const MAX_ROWS = 60;           // 一度に表示する最大件数（多すぎると画面が重くなるため）
+const STALE_MINUTES = 30;      // データの取得がこれより古ければ、自動更新が止まっている可能性を知らせる
+const TIER_HIGH = 40000;       // 1マスあたりこれ以上なら「高い」（金色）
+const TIER_MID = 15000;        // これ以上なら「普通」
 
-let currentMode = 'regular';   // tarkov.dev では PvP を "regular" と呼ぶ
-let seasonModeName = null;     // データにシーズン用のモードがあれば、その名前が入る
-const dataByMode = {};         // 読み込んだデータを使い回すための入れ物
+const state = { mode: 'regular', q: '', filter: 'all', sort: 'auto' };
+const dataByMode = {};
+let seasonAvailable = false;
 
-const $search = document.getElementById('search');
-const $status = document.getElementById('status');
-const $results = document.getElementById('results');
-const $onlyNeeded = document.getElementById('onlyNeeded');
-const $updated = document.getElementById('updated');
+const $ = id => document.getElementById(id);
+const $q = $('q'), $list = $('list'), $meta = $('meta'), $more = $('more'), $notice = $('notice'), $sort = $('sort');
 
 // ---- データの読み込み ----
 
@@ -24,23 +24,7 @@ async function fetchJson(name) {
   return res.json();
 }
 
-// どのモードのデータがあるかを status.json で確認し、シーズン用のモードがあればタブを有効にする
-async function detectSeasonMode() {
-  try {
-    const st = await fetchJson('status.json');
-    seasonModeName = Object.keys(st.modes || {}).find(m => m !== 'regular' && m !== 'pve' && st.modes[m].ok) || null;
-    if (seasonModeName) {
-      const btn = document.querySelector('.mode[data-mode="season"]');
-      btn.disabled = false;
-      btn.title = '';
-      btn.textContent = 'シーズン';
-    }
-  } catch (e) {
-    console.warn('status.json を読めませんでした', e);
-  }
-}
-
-async function loadMode(mode) {
+function loadMode(mode) {
   if (!dataByMode[mode]) {
     dataByMode[mode] = fetchJson(`${mode}.json`).then(prepare).catch(e => {
       delete dataByMode[mode]; // 失敗したら次回やり直せるように消しておく
@@ -50,102 +34,181 @@ async function loadMode(mode) {
   return dataByMode[mode];
 }
 
-// 検索しやすいように、名前を「ひらがな・小文字・半角」にそろえたものを各アイテムに持たせておく
+// 表示や並び替えに使う値を、読み込んだときに一度だけ計算しておく
 function prepare(data) {
-  for (const it of data.items) it.key = normalize(`${it.n} ${it.e} ${it.s}`);
+  for (const it of data.items) {
+    it.key = normalize(`${it.n} ${it.e} ${it.s}`);
+    it.slots = it.w || 1;
+
+    const flea = it.nf ? 0 : it.f || 0;
+    const trader = it.t ? it.t[1] : 0;
+    it.sell = flea > trader
+      ? { where: 'フリマ', price: flea, level: it.ml }
+      : { where: it.t ? it.t[0] : '—', price: trader };
+    it.per = Math.round(it.sell.price / it.slots);
+
+    const uses = (it.u || []).map(([ti, count, fir]) => ({ ...data.tasks[ti], count, fir }));
+    const hide = (it.h || []).map(([hi, count, fir]) => ({ name: data.hideout[hi], count, fir }));
+    it.uses = uses;
+    it.hide = hide;
+    it.kappaN = sum(uses.filter(u => u.k));
+    it.taskN = sum(uses) - it.kappaN;
+    it.hideN = sum(hide);
+    const needs = [...uses, ...hide];
+    it.fir = !needs.length ? '' : needs.every(x => x.fir) ? 'all' : needs.some(x => x.fir) ? 'some' : '';
+    it.verdict = it.kappaN ? 'kappa' : it.taskN ? 'task' : it.hideN ? 'hideout' : 'sell';
+  }
   return data;
 }
+
+const sum = list => list.reduce((n, x) => n + x.count, 0);
 
 function normalize(s) {
   return String(s).normalize('NFKC').toLowerCase()
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)) // カタカナ→ひらがな
-    .replace(/[\s\-・.]/g, '');
+    .replace(/[\s\-・.()（）]/g, '');
 }
 
 // ---- 検索と表示 ----
 
-async function runSearch() {
-  const q = normalize($search.value.trim());
-  const mode = currentMode === 'season' ? seasonModeName : currentMode;
-  if (q.length < 2) {
-    $results.innerHTML = '';
-    $status.textContent = '2文字以上入力すると検索します。';
+async function render() {
+  saveState();
+  let data;
+  try {
+    data = await loadMode(state.mode);
+  } catch (e) {
+    $meta.textContent = `データを取得できませんでした（${e.message}）。少し待ってから再読み込みしてください。`;
+    $list.innerHTML = '';
     return;
   }
-  $status.textContent = 'データを読み込み中…';
-  try {
-    const data = await loadMode(mode);
-    if (q !== normalize($search.value.trim())) return; // 待っている間に入力が変わっていたら捨てる
-    $updated.textContent = `価格の更新: ${ago(data.updatedAt)}`;
+  showFreshness(data);
 
-    let list = data.items.filter(it => it.key.includes(q));
-    if ($onlyNeeded.checked) list = list.filter(it => it.u || it.h);
-    // 名前の先頭が一致するものを上に、そのあとは名前の短い順
-    list.sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || a.n.length - b.n.length);
-    const total = list.length;
-    list = list.slice(0, MAX_RESULTS);
+  const q = normalize(state.q);
+  let list = data.items;
+  if (q) list = list.filter(it => it.key.includes(q));
+  if (state.filter === 'kappa') list = list.filter(it => it.kappaN);
+  if (state.filter === 'task') list = list.filter(it => it.kappaN || it.taskN);
+  if (state.filter === 'hideout') list = list.filter(it => it.hideN);
+  if (!q && state.filter === 'all') list = list.filter(it => it.sell.price > 0);
 
-    $results.innerHTML = list.map(it => renderItem(it, data)).join('');
-    $status.textContent = total === 0 ? '見つかりませんでした。'
-      : total > MAX_RESULTS ? `${total}件中、上位${MAX_RESULTS}件を表示しています。`
-      : `${total}件見つかりました。`;
-  } catch (e) {
-    $status.textContent = `データを取得できませんでした: ${e.message}`;
-  }
+  const bySlot = (a, b) => b.per - a.per;
+  const byPrice = (a, b) => b.sell.price - a.sell.price;
+  if (state.sort === 'price') list.sort(byPrice);
+  else if (state.sort === 'slot' || !q) list.sort(bySlot);
+  else list.sort((a, b) => (b.key.startsWith(q) - a.key.startsWith(q)) || bySlot(a, b)); // 名前の先頭が一致するものを優先
+
+  const total = list.length;
+  $list.innerHTML = list.slice(0, MAX_ROWS).map(it => renderItem(it, data)).join('');
+
+  const label = !q && state.filter === 'all' ? '1マスあたりの価値が高いアイテム'
+    : !q ? `${filterName()}で必要なアイテム` : `「${state.q}」の検索結果`;
+  $meta.textContent = total ? `${label}：${total}件` : `${label}：見つかりませんでした。略称や英語名でも検索できます。`;
+  $more.hidden = total <= MAX_ROWS;
+  $more.textContent = `上位${MAX_ROWS}件を表示しています。名前を入力すると絞り込めます。`;
 }
 
 function renderItem(it, data) {
-  const uses = (it.u || []).map(([ti, count, fir]) => ({ ...data.tasks[ti], count, fir }));
-  const hideout = (it.h || []).map(([hi, count]) => ({ name: data.hideout[hi], count }));
-
-  const flea = it.nf
-    ? '<span><span class="label">フリマ</span>出品不可</span>'
-    : `<span><span class="label">フリマ最安</span><b>${rub(it.f)}</b></span>
-       <span><span class="label">24時間平均</span><b>${rub(it.a)}</b></span>`;
-  const trader = it.t
-    ? `<span><span class="label">${esc(it.t[0])}に売却</span><b>${rub(it.t[1])}</b></span>`
-    : '';
   const icon = it.i ? (it.i.startsWith('http') ? it.i : data.iconPrefix + it.i) : '';
+  const tier = it.per >= TIER_HIGH ? 'tier-high' : it.per >= TIER_MID ? 'tier-mid' : 'tier-low';
+  const where = it.sell.price
+    ? `${esc(it.sell.where)}${it.sell.level ? `（Lv${it.sell.level}〜）` : ''} ${rub(it.sell.price)}${it.slots > 1 ? `・${it.slots}マス` : ''}`
+    : '売却不可';
 
   return `<li class="item">
-    <img src="${esc(icon)}" alt="" loading="lazy">
-    <div>
-      <h2>${esc(it.n)}<small>${esc(it.s)}</small></h2>
-      ${it.e && it.e !== it.n ? `<p class="en">${esc(it.e)}</p>` : ''}
-      <div class="badges">${renderBadges(uses, hideout)}</div>
-      <div class="prices">${flea}${trader}</div>
-      ${renderList('使うタスク', uses.map(u =>
-        `${esc(u.n)}（${esc(u.tr)}）×${u.count}${u.fir ? ' FIR' : ''}${u.k ? ' ・Kappa' : ''}`))}
-      ${renderList('使うハイドアウト', hideout.map(h => `${esc(h.name)} ×${h.count}`))}
+    <div class="row">
+      <img class="icon" src="${esc(icon)}" alt="" loading="lazy" width="52" height="52">
+      <div class="name">
+        <h2>${esc(it.n)}<small>${esc(it.s)}</small></h2>
+        ${it.e && it.e !== it.n ? `<div class="sub">${esc(it.e)}</div>` : ''}
+        ${renderVerdict(it)}
+      </div>
+      <div class="value">
+        <div class="per ${tier}">${it.per ? rub(it.per) : '—'}<small>/マス</small></div>
+        <div class="where">${where}</div>
+      </div>
     </div>
+    <details class="more-info"><summary>くわしく</summary><div class="info">${renderInfo(it)}</div></details>
   </li>`;
 }
 
-function renderBadges(uses, hideout) {
-  if (!uses.length && !hideout.length) return '<span class="badge none">タスク・ハイドアウトでは不要</span>';
-  const sum = list => list.reduce((n, x) => n + x.count, 0);
-  const kappa = sum(uses.filter(u => u.k));
-  const other = sum(uses) - kappa;
-  let html = '';
-  if (kappa) html += `<span class="badge kappa">Kappaに必要 ×${kappa}</span>`;
-  if (other) html += `<span class="badge task">その他タスク ×${other}</span>`;
-  if (uses.some(u => u.fir)) html += '<span class="badge task">FIR（レイド内で入手）が必要</span>';
-  if (hideout.length) html += `<span class="badge hideout">ハイドアウト ×${sum(hideout)}</span>`;
-  return html;
+function renderVerdict(it) {
+  const labels = { kappa: 'Kappa用に保管', task: 'タスク用に保管', hideout: 'ハイドアウト用に保管', sell: '売ってOK' };
+  const needs = [];
+  if (it.kappaN) needs.push(`Kappa ×${it.kappaN}`);
+  if (it.taskN) needs.push(`タスク ×${it.taskN}`);
+  if (it.hideN) needs.push(`ハイドアウト ×${it.hideN}`);
+  const fir = it.fir === 'all' ? '（FIRのみ）' : it.fir === 'some' ? '（一部FIR）' : '';
+  return `<span class="verdict ${it.verdict}">${labels[it.verdict]}${it.verdict !== 'sell' ? fir : ''}</span>`
+    + (needs.length ? `<span class="needs">${needs.join('・')}</span>` : '');
 }
 
-function renderList(title, rows) {
-  if (!rows.length) return '';
-  return `<details><summary>${title}（${rows.length}件）</summary><ul>${rows.map(r => `<li>${r}</li>`).join('')}</ul></details>`;
+function renderInfo(it) {
+  const parts = [];
+  if (it.uses.length) {
+    parts.push(`<div><h3>使うタスク</h3><ul>${it.uses.map(u =>
+      `<li>${u.k ? '<span class="k">[Kappa]</span> ' : ''}${esc(u.n)}（${esc(u.tr)}）×${u.count}${u.fir ? ' <span class="fir">FIR</span>' : ''}</li>`).join('')}</ul></div>`);
+  }
+  if (it.hide.length) {
+    parts.push(`<div><h3>使うハイドアウト</h3><ul>${it.hide.map(h =>
+      `<li>${esc(h.name)} ×${h.count}${h.fir ? ' <span class="fir">FIR</span>' : ''}</li>`).join('')}</ul></div>`);
+  }
+  parts.push(`<div><h3>価格</h3><div class="prices">
+    <div><span>フリマ最安</span>${it.nf ? '出品不可' : rub(it.f)}</div>
+    <div><span>24時間平均</span>${it.nf ? '—' : rub(it.a)}</div>
+    ${it.t ? `<div><span>${esc(it.t[0])}</span>${rub(it.t[1])}</div>` : ''}
+    ${it.ml && !it.nf ? `<div><span>フリマ出品</span>Lv${it.ml}から</div>` : ''}
+  </div></div>`);
+  return parts.join('');
+}
+
+// 価格の新しさを表示し、自動更新が止まっていそうなら警告を出す
+function showFreshness(data) {
+  const builtMin = minutesSince(data.builtAt || data.updatedAt);
+  $notice.hidden = builtMin < STALE_MINUTES;
+  $notice.textContent = `価格データの自動更新が止まっている可能性があります（最後の取得: ${ago(builtMin)}）。表示中の価格は古いかもしれません。`;
+  $q.title = `フリマ価格の調査: ${ago(minutesSince(data.updatedAt))}`;
+  $sort.parentElement.title = $q.title;
+}
+
+function filterName() {
+  return { kappa: 'Kappa', task: 'タスク', hideout: 'ハイドアウト' }[state.filter] || '';
+}
+
+// ---- 状態の保存（URLと、最後に選んだモード） ----
+
+function saveState() {
+  const p = new URLSearchParams();
+  if (state.q) p.set('q', state.q);
+  if (state.mode !== 'regular') p.set('m', state.mode);
+  if (state.filter !== 'all') p.set('f', state.filter);
+  if (state.sort !== 'auto') p.set('s', state.sort);
+  history.replaceState(null, '', p.toString() ? `?${p}` : location.pathname);
+  try { localStorage.setItem('mode', state.mode); } catch {}
+}
+
+function restoreState() {
+  const p = new URLSearchParams(location.search);
+  let saved = null;
+  try { saved = localStorage.getItem('mode'); } catch {}
+  state.mode = p.get('m') || saved || 'regular';
+  state.q = p.get('q') || '';
+  state.filter = p.get('f') || 'all';
+  state.sort = p.get('s') || 'auto';
+  $q.value = state.q;
+  $sort.value = state.sort;
+}
+
+function syncButtons() {
+  document.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-selected', String(b.dataset.mode === state.mode)));
+  document.querySelectorAll('.chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.filter === state.filter)));
 }
 
 // ---- 小さな道具 ----
 
-function rub(n) { return n ? `${Math.round(n).toLocaleString('ja-JP')} ₽` : '—'; }
-
-function ago(iso) {
-  if (!iso) return '不明';
-  const min = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+function rub(n) { return n ? `${Math.round(n).toLocaleString('ja-JP')}₽` : '—'; }
+function minutesSince(iso) { return iso ? Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)) : Infinity; }
+function ago(min) {
+  if (!isFinite(min)) return '不明';
   if (min < 60) return `${min}分前`;
   if (min < 60 * 24) return `${Math.round(min / 60)}時間前`;
   return `${Math.round(min / 1440)}日前`;
@@ -156,19 +219,59 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// 入力のたびに検索すると重いので、打ち終わって0.25秒たってから検索する
-let timer;
-$search.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(runSearch, 250); });
-$onlyNeeded.addEventListener('change', runSearch);
+// ---- 操作 ----
 
-document.querySelectorAll('.mode').forEach(btn => {
-  btn.addEventListener('click', () => {
-    if (btn.disabled) return;
-    currentMode = btn.dataset.mode;
-    document.querySelectorAll('.mode').forEach(b => b.setAttribute('aria-selected', String(b === btn)));
-    runSearch();
-  });
+let timer;
+$q.addEventListener('input', () => {
+  clearTimeout(timer);
+  timer = setTimeout(() => { state.q = $q.value.trim(); render(); }, 80);
+});
+$sort.addEventListener('change', () => { state.sort = $sort.value; render(); });
+
+document.querySelectorAll('.chip').forEach(btn => btn.addEventListener('click', () => {
+  state.filter = btn.dataset.filter;
+  syncButtons();
+  render();
+}));
+
+document.querySelectorAll('.mode').forEach(btn => btn.addEventListener('click', () => {
+  if (btn.disabled) return;
+  state.mode = btn.dataset.mode;
+  syncButtons();
+  $meta.textContent = 'データを読み込み中…';
+  render();
+}));
+
+// 「/」でいつでも検索欄へ、「Esc」で入力を消す
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement !== $q) {
+    e.preventDefault();
+    $q.focus();
+    $q.select();
+  } else if (e.key === 'Escape' && document.activeElement === $q) {
+    $q.value = '';
+    state.q = '';
+    render();
+  }
 });
 
-detectSeasonMode();
-loadMode('regular').catch(() => {}); // 最初のモードは先に読み込んでおき、検索を速くする
+// どのモードのデータがあるかを status.json で確認し、シーズンのタブを有効にする
+async function detectSeason() {
+  try {
+    const st = await fetchJson('status.json');
+    seasonAvailable = !!st.modes?.season?.ok;
+  } catch {}
+  const btn = document.querySelector('.mode[data-mode="season"]');
+  btn.disabled = !seasonAvailable;
+  btn.title = seasonAvailable ? '' : 'シーズンのデータを取得できませんでした';
+  if (state.mode === 'season' && !seasonAvailable) {
+    state.mode = 'regular';
+    syncButtons();
+    render();
+  }
+}
+
+restoreState();
+syncButtons();
+render();
+detectSeason();

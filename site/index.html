@@ -3,34 +3,65 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tarkov Loot Checker</title>
-  <meta name="description" content="Escape from Tarkov のルートアイテムのフリマ価格と、Kappa・タスクで必要かどうかをすぐ調べられる検索サイト">
-  <link rel="stylesheet" href="style.css">
+  <title>Tarkov Loot Checker｜タルコフのフリマ価格とKappa・タスク必要アイテム検索</title>
+  <meta name="description" content="Escape from Tarkov のアイテムを名前で検索して、フリマ価格、1マスあたりの価値、Kappa・タスク・ハイドアウトで必要かどうかをすぐ確認できます。PvP・PvE・シーズン対応。">
+  <meta name="theme-color" content="#101211">
+  <meta property="og:title" content="Tarkov Loot Checker">
+  <meta property="og:description" content="タルコフのアイテムを持ち帰るか売るか、数秒で判断。フリマ価格とKappa・タスク・ハイドアウト必要数を表示。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://tarkov-loot-checker.com/">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8b273'/%3E%3Cpath d='M9 9h14v4h-5v10h-4V13H9z' fill='%23101211'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
-  <header class="header">
-    <h1 class="logo">Tarkov Loot Checker</h1>
-    <!-- モード切替タブ。シーズンはAPIが対応しているときだけ押せるようになる -->
-    <nav class="modes" role="tablist" aria-label="ゲームモード">
-      <button class="mode" data-mode="regular" role="tab" aria-selected="true">PvP</button>
-      <button class="mode" data-mode="pve" role="tab" aria-selected="false">PvE</button>
-      <button class="mode" data-mode="season" role="tab" aria-selected="false" disabled title="準備中">シーズン（準備中）</button>
-    </nav>
+  <header class="top">
+    <div class="wrap top-inner">
+      <a class="logo" href="./">Tarkov <span>Loot Checker</span></a>
+      <nav class="modes" role="tablist" aria-label="ゲームモード">
+        <button class="mode" data-mode="regular" role="tab">PvP</button>
+        <button class="mode" data-mode="pve" role="tab">PvE</button>
+        <button class="mode" data-mode="season" role="tab" disabled>シーズン</button>
+      </nav>
+    </div>
   </header>
 
-  <main class="main">
-    <input id="search" class="search" type="search" placeholder="アイテム名で検索（例: グラフィック、GPU、ledx）" autocomplete="off" autofocus>
-    <label class="filter"><input id="onlyNeeded" type="checkbox"> タスク・ハイドアウトで必要なものだけ表示</label>
-    <span id="updated" class="updated"></span>
-    <p id="status" class="status">2文字以上入力すると検索します。</p>
-    <ul id="results" class="results"></ul>
+  <div class="searchbar">
+    <div class="wrap">
+      <label class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="アイテム名・略称で検索（例: グラフィック、gpu、ledx）" autocomplete="off" spellcheck="false" enterkeyhint="search">
+        <kbd title="/ キーでいつでも検索欄に移動">/</kbd>
+      </label>
+      <div class="controls">
+        <div class="chips" role="group" aria-label="絞り込み">
+          <button class="chip" data-filter="all">すべて</button>
+          <button class="chip kappa" data-filter="kappa">Kappa</button>
+          <button class="chip task" data-filter="task">タスク</button>
+          <button class="chip hideout" data-filter="hideout">ハイドアウト</button>
+        </div>
+        <label class="sort">並び順
+          <select id="sort">
+            <option value="auto">おすすめ</option>
+            <option value="slot">1マスの価値</option>
+            <option value="price">売値</option>
+          </select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="notice" class="notice" hidden></div>
+    <p id="meta" class="meta">データを読み込み中…</p>
+    <ul id="list" class="list"></ul>
+    <p id="more" class="more" hidden></p>
   </main>
 
-  <footer class="footer">
-    価格・タスクデータ提供: <a href="https://tarkov.dev" target="_blank" rel="noopener">tarkov.dev</a>
-    ／ 本サイトは非公式のファンサイトで、Battlestate Games とは関係ありません。
+  <footer class="wrap footer">
+    <p>価格・タスク・ハイドアウトのデータ: <a href="https://tarkov.dev" target="_blank" rel="noopener">tarkov.dev</a>（5分ごとに自動更新）</p>
+    <p>本サイトは非公式のファンサイトで、Battlestate Games とは関係ありません。</p>
   </footer>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
