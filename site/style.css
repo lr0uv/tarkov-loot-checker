@@ -1,0 +1,79 @@
+/* 色はここでまとめて定義。ダークモードのときは下で上書きする */
+:root {
+  --bg: #f6f5f2;
+  --card: #ffffff;
+  --text: #1d1d1b;
+  --muted: #6b6a66;
+  --line: #e2e0da;
+  --accent: #8a6d1f;
+  --kappa: #7a3fb0;
+  --task: #1f6f8b;
+  --none: #8a8a85;
+  --hideout: #2f7d4a;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141412;
+    --card: #1e1e1b;
+    --text: #ecebe6;
+    --muted: #a3a29c;
+    --line: #34332f;
+    --accent: #d8b558;
+    --kappa: #c08ff0;
+    --task: #6cc3e0;
+    --none: #77766f;
+    --hideout: #7fd39a;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  line-height: 1.5;
+}
+a { color: var(--accent); }
+
+.header, .main, .footer { max-width: 860px; margin: 0 auto; padding: 16px; }
+.header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.logo { font-size: 1.3rem; margin: 0; letter-spacing: .02em; }
+
+.modes { display: flex; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 4px; }
+.mode { border: 0; background: transparent; color: var(--text); padding: 6px 14px; border-radius: 7px; font-size: .95rem; cursor: pointer; }
+.mode[aria-selected="true"] { background: var(--accent); color: var(--bg); font-weight: 600; }
+.mode:disabled { color: var(--none); cursor: not-allowed; }
+
+.search { width: 100%; font-size: 1.1rem; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); }
+.filter { display: inline-block; margin-top: 10px; color: var(--muted); font-size: .9rem; }
+.status { color: var(--muted); font-size: .9rem; }
+
+.results { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.item { display: grid; grid-template-columns: 64px 1fr; gap: 12px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.item img { width: 64px; height: 64px; object-fit: contain; }
+.item h2 { font-size: 1.05rem; margin: 0 0 4px; }
+.item h2 small { color: var(--muted); font-weight: normal; margin-left: 6px; }
+
+.prices { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: .92rem; }
+.prices b { font-variant-numeric: tabular-nums; }
+.prices .label { color: var(--muted); margin-right: 4px; }
+
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.badge { font-size: .8rem; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.badge.kappa { color: var(--kappa); }
+.badge.task { color: var(--task); }
+.badge.none { color: var(--none); }
+.badge.hideout { color: var(--hideout); }
+.en { margin: -2px 0 4px; color: var(--muted); font-size: .85rem; }
+.updated { margin-left: 12px; color: var(--muted); font-size: .85rem; }
+
+details { font-size: .88rem; color: var(--muted); }
+details ul { margin: 4px 0 0; padding-left: 18px; }
+
+.footer { color: var(--muted); font-size: .8rem; border-top: 1px solid var(--line); margin-top: 24px; }
+
+@media (max-width: 480px) {
+  .item { grid-template-columns: 48px 1fr; }
+  .item img { width: 48px; height: 48px; }
+}

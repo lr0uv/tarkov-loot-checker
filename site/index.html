@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarkov Loot Checker</title>
+  <meta name="description" content="Escape from Tarkov のルートアイテムのフリマ価格と、Kappa・タスクで必要かどうかをすぐ調べられる検索サイト">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">Tarkov Loot Checker</h1>
+    <!-- モード切替タブ。シーズンはAPIが対応しているときだけ押せるようになる -->
+    <nav class="modes" role="tablist" aria-label="ゲームモード">
+      <button class="mode" data-mode="regular" role="tab" aria-selected="true">PvP</button>
+      <button class="mode" data-mode="pve" role="tab" aria-selected="false">PvE</button>
+      <button class="mode" data-mode="season" role="tab" aria-selected="false" disabled title="準備中">シーズン（準備中）</button>
+    </nav>
+  </header>
+
+  <main class="main">
+    <input id="search" class="search" type="search" placeholder="アイテム名で検索（例: グラフィック、GPU、ledx）" autocomplete="off" autofocus>
+    <label class="filter"><input id="onlyNeeded" type="checkbox"> タスク・ハイドアウトで必要なものだけ表示</label>
+    <span id="updated" class="updated"></span>
+    <p id="status" class="status">2文字以上入力すると検索します。</p>
+    <ul id="results" class="results"></ul>
+  </main>
+
+  <footer class="footer">
+    価格・タスクデータ提供: <a href="https://tarkov.dev" target="_blank" rel="noopener">tarkov.dev</a>
+    ／ 本サイトは非公式のファンサイトで、Battlestate Games とは関係ありません。
+  </footer>
+
+  <script src="app.js?v=2"></script>
+</body>
+</html>

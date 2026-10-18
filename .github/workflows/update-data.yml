@@ -1,0 +1,50 @@
+name: Update data
+
+# tarkov.dev から最新データを取り、data ブランチに保存する。
+# サイトは data ブランチのファイルを raw.githubusercontent.com 経由で読む。
+on:
+  schedule:
+    - cron: '*/15 * * * *' # 15分ごと（GitHubの都合で数分遅れることがある）
+  workflow_dispatch: # 手動実行ボタン
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # 前回のデータを out/ に取り出す（今回失敗したモードは前回の分を残すため）
+      - name: Restore previous data
+        run: |
+          mkdir -p out
+          if git fetch --depth 1 origin data; then
+            git --work-tree=out checkout FETCH_HEAD -- . || true
+          fi
+
+      - name: Build data
+        run: node scripts/build-data.mjs out
+
+      # 成功・失敗どちらでも保存する（status.json に結果が残る）
+      - name: Publish to data branch
+        if: always()
+        run: |
+          cd out
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -q -b data
+          git add -A
+          git commit -q -m "Update data $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
