@@ -1,0 +1,43 @@
+name: Deploy site
+
+# site/ フォルダが変わったら、シンレンタルサーバーの public_html に自動でアップロードする。
+# 使うには、GitHub の Settings → Secrets and variables → Actions に次の3つを登録する：
+#   FTP_SERVER   FTPサーバー（ホスト）名
+#   FTP_USERNAME public_html 専用に作ったFTPアカウント名
+#   FTP_PASSWORD そのFTPアカウントのパスワード
+on:
+  push:
+    branches: [main]
+    paths: ['site/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check FTP settings
+        id: check
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+        run: |
+          if [ -z "$FTP_SERVER" ]; then
+            echo "FTPの設定（Secrets）がまだ登録されていないので、アップロードを飛ばします。"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.check.outputs.ready == 'true'
+
+      - name: Upload site/ to the server
+        if: steps.check.outputs.ready == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./site/
+          server-dir: ./

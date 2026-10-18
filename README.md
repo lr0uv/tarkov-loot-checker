@@ -12,6 +12,8 @@ Escape from Tarkov のアイテムを検索して、フリマ価格（PvP / PvE�
 
 サーバー側で動くプログラムがないので、`site/` の3ファイルをレンタルサーバーの `public_html` に置くだけで動きます。データの更新でサイトを置き直す必要はありません。
 
+`site/` を変更して main に入れると、`.github/workflows/deploy-site.yml` がFTPで `public_html` に自動アップロードします（Secrets に `FTP_SERVER`・`FTP_USERNAME`・`FTP_PASSWORD` の登録が必要です）。
+
 ## データの確認
 
 - 最新の取得結果：`data` ブランチの `status.json`
