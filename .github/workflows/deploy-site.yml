@@ -52,13 +52,51 @@ jobs:
         if: steps.check.outputs.ready == 'true'
         run: node scripts/build-pages.mjs dist
 
-      - name: Upload to the server
+      # 1万ファイル近くあるので、1本の接続で順番に送ると途中で接続が切れる（2026-10-19に51分でタイムアウト）。
+      # lftp で8本同時に送り、切れても自動でつなぎ直す。
+      # 前回送ったファイルの指紋（ハッシュ）をサーバーの .deploy-manifest.txt に残し、変わったファイルだけ送る。
+      - name: Install lftp
         if: steps.check.outputs.ready == 'true'
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./dist/
-          server-dir: ./
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+
+      - name: Upload changed files to the server
+        if: steps.check.outputs.ready == 'true'
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cat > lftp.rc <<'RC'
+          set ftp:ssl-force true
+          set ftp:ssl-protect-data true
+          set ssl:verify-certificate yes
+          set net:timeout 30
+          set net:max-retries 8
+          set net:reconnect-interval-base 5
+          set net:reconnect-interval-max 60
+          set cmd:fail-exit true
+          RC
+          # パスワードは環境変数で渡す（記号を含んでいても壊れないように）
+          export LFTP_PASSWORD="$FTP_PASSWORD"
+          ftp() { lftp -u "$FTP_USERNAME" --env-password -e "source lftp.rc; $1; bye" "$FTP_SERVER"; }
+
+          # 前回の記録を取ってくる（初回はないので空）
+          ftp "get -O . .deploy-manifest.txt" || : > .deploy-manifest.txt
+          (cd dist && find . -type f | sort | xargs sha1sum) > new-manifest.txt
+
+          # 指紋が前回と違うファイルだけを staging/ に集める
+          rm -rf staging && mkdir staging
+          comm -13 <(sort .deploy-manifest.txt) <(sort new-manifest.txt) | awk '{print $2}' > changed.txt
+          echo "変わったファイル: $(wc -l < changed.txt) / 全体: $(wc -l < new-manifest.txt)"
+          if [ -s changed.txt ]; then (cd dist && xargs -a ../changed.txt cp --parents -t ../staging); fi
+
+          # トップページ（index.html）は最後に送る。先に送ると、新しいページが古いJSを読んで壊れることがあるため
+          mkdir -p last
+          if [ -f staging/index.html ]; then mv staging/index.html last/; fi
+          if [ -n "$(ls -A staging)" ]; then ftp "mirror -R --parallel=8 --no-perms --verbose=0 staging ./"; fi
+          if [ -f last/index.html ]; then ftp "put -O . last/index.html"; fi
+
+          # 全部送れたときだけ記録を更新する（途中で失敗したら、次回また送り直す）
+          cp new-manifest.txt .deploy-manifest.txt
+          ftp "put -O . .deploy-manifest.txt"
