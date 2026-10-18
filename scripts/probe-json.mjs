@@ -1,44 +1,42 @@
-// 調査用：json.tarkov.dev の配布ファイルの一覧と中身の形を out/probe.json に書き出す
+// 調査用：json.tarkov.dev のファイルの中身の形を out/probe.json に書き出す
 import fs from 'node:fs';
 
 const BASE = 'https://json.tarkov.dev/';
 const out = { at: new Date().toISOString() };
+const get = async p => (await fetch(BASE + p)).json();
 
-function shape(v, depth = 0) {
-  if (Array.isArray(v)) return v.length ? [`len=${v.length}`, shape(v[0], depth + 1)] : [];
-  if (v && typeof v === 'object') {
-    if (depth > 3) return '{…}';
-    const o = {};
-    for (const [k, x] of Object.entries(v).slice(0, 40)) o[k] = shape(x, depth + 1);
-    return o;
-  }
-  return typeof v === 'string' ? `str:${v.slice(0, 60)}` : v;
-}
+const items = (await get('regular/items')).data;
+out.itemsTopKeys = Object.keys(items);
+const gpu = items.items['57347ca924597744596b4e71'];
+out.gpu = gpu && Object.fromEntries(Object.entries(gpu).filter(([k]) => !/image|Link$/i.test(k) || k === 'iconLink'));
+const allKeys = new Set();
+for (const it of Object.values(items.items)) Object.keys(it).forEach(k => allKeys.add(k));
+out.itemAllKeys = [...allKeys];
+for (const k of out.itemsTopKeys) if (k !== 'items') out['items.' + k] = JSON.stringify(items[k]).slice(0, 800);
 
-async function get(path) {
-  const res = await fetch(BASE + path);
-  const text = await res.text();
-  try { return { status: res.status, size: text.length, json: JSON.parse(text) }; }
-  catch { return { status: res.status, size: text.length, text: text.slice(0, 500) }; }
-}
+const tasks = (await get('regular/tasks')).data;
+out.tasksTopKeys = Object.keys(tasks);
+const tlist = Object.values(tasks.tasks);
+out.taskCount = tlist.length;
+const objTypes = {};
+for (const t of tlist) for (const o of t.objectives || []) if (!objTypes[o.type]) objTypes[o.type] = o;
+out.objectiveSamples = objTypes;
+out.taskKeys = [...new Set(tlist.flatMap(t => Object.keys(t)))];
+for (const k of out.tasksTopKeys) if (k !== 'tasks') out['tasks.' + k] = JSON.stringify(tasks[k]).slice(0, 600);
 
-const cat = await get('endpoints');
-out.endpoints = cat.json ?? cat;
-const names = new Set();
-const walk = v => {
-  if (typeof v === 'string' && /^[a-z_]+$/i.test(v)) names.add(v);
-  else if (Array.isArray(v)) v.forEach(walk);
-  else if (v && typeof v === 'object') Object.values(v).forEach(walk);
-};
-walk(out.endpoints);
-out.samples = {};
-for (const n of ['items', 'tasks', 'hideout', 'hideoutStations', 'item_prices', 'prices', 'traders', ...names].slice(0, 30)) {
-  for (const p of [`regular/${n}`, `regular/${n}_ja`, `pve/${n}`]) {
-    if (out.samples[p]) continue;
-    const r = await get(p);
-    out.samples[p] = r.json ? { status: r.status, size: r.size, shape: shape(r.json) } : r;
-  }
-}
+const hideout = (await get('regular/hideout')).data;
+out.hideoutLevelSample = Object.values(hideout)[7]?.levels?.[1];
+
+const traders = (await get('regular/traders')).data;
+out.tradersShape = JSON.stringify(traders).slice(0, 800);
+const tja = (await get('regular/traders_ja')).data;
+out.tradersJa = JSON.stringify(tja).slice(0, 600);
+
+const season = await fetch(BASE + 'pvp-season/items').then(r => r.status + ' ' + r.headers.get('content-length')).catch(e => e.message);
+out.seasonItems = season;
+const seasonInfo = await fetch(BASE + 'pvp-season/season').then(r => r.text()).catch(e => e.message);
+out.seasonInfo = seasonInfo.slice(0, 1500);
+
 fs.mkdirSync('out', { recursive: true });
 fs.writeFileSync('out/probe.json', JSON.stringify(out, null, 1));
 console.log('probe done');
