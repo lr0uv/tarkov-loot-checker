@@ -6,7 +6,7 @@ Escape from Tarkov のアイテムを検索して、フリマ価格（PvP / PvE�
 
 ## 仕組み
 
-1. GitHub Actions（`.github/workflows/update-data.yml`）が15分ごとに `scripts/build-data.mjs` を実行し、[tarkov.dev](https://tarkov.dev) から価格・タスク・ハイドアウトのデータを取得します。
+1. GitHub Actions（`.github/workflows/update-data.yml`）が5分ごとに `scripts/build-data.mjs` を実行し、[tarkov.dev](https://tarkov.dev) から価格・タスク・ハイドアウトのデータを取得します。
 2. 取得したデータは `data` ブランチに `regular.json`（PvP）、`pve.json`、`status.json` として保存されます。履歴は残さず、毎回1コミットで上書きします。
 3. サイト（`site/` フォルダ）は、そのファイルを `raw.githubusercontent.com` 経由で読み込み、ブラウザの中で検索します。
 

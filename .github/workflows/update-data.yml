@@ -4,7 +4,7 @@ name: Update data
 # サイトは data ブランチのファイルを raw.githubusercontent.com 経由で読む。
 on:
   schedule:
-    - cron: '*/15 * * * *' # 15分ごと（GitHubの都合で数分遅れることがある）
+    - cron: '*/5 * * * *' # 5分ごと（GitHubで設定できる最短。混雑時は数分〜十数分遅れることがある）
   workflow_dispatch: # 手動実行ボタン
 
 permissions:

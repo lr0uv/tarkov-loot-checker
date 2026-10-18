@@ -1,5 +1,5 @@
 // Tarkov Loot Checker の本体。
-// 価格・タスクのデータは GitHub Actions が15分ごとに tarkov.dev から取ってきて、
+// 価格・タスクのデータは GitHub Actions が5分ごとに tarkov.dev から取ってきて、
 // GitHub の data ブランチに置いている。このページはそのファイルを読んで、ブラウザの中で検索するだけ。
 
 const DATA_BASE = 'https://raw.githubusercontent.com/lr0uv/tarkov-loot-checker/data/';
