@@ -41,6 +41,7 @@ jobs:
         if: always()
         run: |
           cd out
+          rm -f probe.json
           git init -q
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

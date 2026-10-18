@@ -57,14 +57,20 @@ async function buildMode(srcMode) {
       k: t.kappaRequired ? 1 : 0,
       lk: t.lightkeeperRequired ? 1 : 0,
     });
+    // 同じタスクに同じアイテムの目標が複数ある場合（場所違いの選択肢など）は、多いほうの個数だけ数える
+    const perTask = new Map(); // itemId -> [count, fir]
     for (const o of t.objectives || []) {
       if (!['giveItem', 'plantItem'].includes(o.type)) continue;
       // 「いずれか1つを渡す」形式（候補が大量にある）は、特定のアイテムが必要とは言えないので除外
       if ((o.items || []).length > 5) continue;
       for (const id of o.items || []) {
-        if (!taskUses.has(id)) taskUses.set(id, []);
-        taskUses.get(id).push([idx, o.count || 1, o.foundInRaid ? 1 : 0]);
+        const prev = perTask.get(id) || [0, 0];
+        perTask.set(id, [Math.max(prev[0], o.count || 1), prev[1] || (o.foundInRaid ? 1 : 0)]);
       }
+    }
+    for (const [id, [count, fir]] of perTask) {
+      if (!taskUses.has(id)) taskUses.set(id, []);
+      taskUses.get(id).push([idx, count, fir]);
     }
   }
 
