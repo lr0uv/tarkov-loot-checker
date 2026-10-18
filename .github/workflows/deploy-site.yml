@@ -1,6 +1,10 @@
 name: Deploy site
 
-# site/ フォルダが変わったら、シンレンタルサーバーの public_html に自動でアップロードする。
+# サーバーに置くファイル一式（検索ページ・ガイド・アイテムごとのページ）を組み立てて、
+# シンレンタルサーバーの public_html に自動でアップロードする。
+#   - main に site/・pages/・組み立てスクリプトの変更が入ったとき
+#   - 毎日1回（新しいアイテムや、PvE/PvP価格差のページを反映するため）
+# アップロードは前回から変わったファイルだけを送る（サーバー上の .ftp-deploy-sync-state.json で管理）。
 # 使うには、GitHub の Settings → Secrets and variables → Actions に次の3つを登録する：
 #   FTP_SERVER   FTPサーバー（ホスト）名
 #   FTP_USERNAME public_html 専用に作ったFTPアカウント名
@@ -8,13 +12,20 @@ name: Deploy site
 on:
   push:
     branches: [main]
-    paths: ['site/**']
+    paths: ['site/**', 'pages/**', 'scripts/build-pages.mjs', '.github/workflows/deploy-site.yml']
+  schedule:
+    - cron: '0 18 * * *' # 毎日 03:00（日本時間）
   workflow_dispatch:
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 初回はアイテムページを数千ファイル送るので長めにしておく
+    timeout-minutes: 120
     steps:
       - name: Check FTP settings
         id: check
@@ -31,7 +42,17 @@ jobs:
       - uses: actions/checkout@v4
         if: steps.check.outputs.ready == 'true'
 
-      - name: Upload site/ to the server
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 20
+
+      # データが取れなければここで失敗して止まる（空のままアップロードしてページを消さないため）
+      - name: Build pages
+        if: steps.check.outputs.ready == 'true'
+        run: node scripts/build-pages.mjs dist
+
+      - name: Upload to the server
         if: steps.check.outputs.ready == 'true'
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -39,5 +60,5 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
-          local-dir: ./site/
+          local-dir: ./dist/
           server-dir: ./
