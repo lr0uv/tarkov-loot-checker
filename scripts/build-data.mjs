@@ -14,6 +14,13 @@ const ICON_PREFIX = 'https://assets.tarkov.dev/';
 // json.tarkov.dev でのモード名 → このサイトでのファイル名
 const MODES = { regular: 'regular', pve: 'pve', 'pvp-season': 'season' };
 
+// tarkov.dev の日本語訳にはトレーダー名がないので、日本のプレイヤーが使う呼び方を自前で持つ
+const TRADER_JA = {
+  Prapor: 'プラポー', Therapist: 'セラピスト', Fence: 'フェンス', Skier: 'スキアー',
+  Peacekeeper: 'ピースキーパー', Mechanic: 'メカニック', Ragman: 'ラグマン', Jaeger: 'イェーガー',
+  Lightkeeper: 'ライトキーパー', Ref: 'レフ', 'BTR Driver': 'BTRドライバー',
+};
+
 const status = { startedAt: new Date().toISOString(), source: BASE, modes: {}, errors: [] };
 
 async function get(path) {
@@ -47,7 +54,11 @@ async function buildMode(srcMode) {
   // 名前は「キー」で入っているので、日本語→英語→キーそのものの順で引く
   const ja = (dict, key, fallback = {}) => dict[key] ?? fallback[key] ?? key;
   const en = (dict, key) => dict[key] ?? key;
-  const traderName = id => (traders[id] ? ja(tradersJa, traders[id].name, tradersEn) : '');
+  const traderName = id => {
+    if (!traders[id]) return '';
+    const name = ja(tradersJa, traders[id].name, tradersEn);
+    return TRADER_JA[name] || name;
+  };
   const traderNameEn = id => (traders[id] ? en(tradersEn, traders[id].name) : '');
 
   // タスク：手渡し(giveItem)と設置(plantItem)だけ数える。findItem は giveItem と重複するため除外
