@@ -27,8 +27,9 @@ async function gql(query, variables = {}) {
   } catch {
     throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
   }
+  if (!json.data && !json.errors) throw new Error(`HTTP ${res.status}: ${text.slice(0, 300)}`);
   if (json.errors?.length) {
-    const msg = json.errors.map(e => e.message).join(' / ');
+    const msg = `HTTP ${res.status}: ` + json.errors.map(e => e.message || JSON.stringify(e)).join(' / ');
     // 一部の項目だけ失敗した場合でも data が返ることがあるので、data が無いときだけ失敗扱い
     if (!json.data) throw new Error(msg);
     status.errors.push(`partial: ${msg.slice(0, 300)}`);
@@ -43,7 +44,7 @@ async function firstWorking(label, attempts) {
     try {
       return await run();
     } catch (e) {
-      errs.push(e.message.slice(0, 300));
+      errs.push(String(e.message || e).slice(0, 300));
     }
   }
   throw new Error(`${label}: ${errs.join(' | ')}`);
