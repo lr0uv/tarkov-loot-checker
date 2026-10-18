@@ -176,7 +176,9 @@ details.more-info[open] summary::before { content: "－ "; }
 .page h3 { font-size: 1rem; margin: 18px 0 6px; }
 .page p, .page li { line-height: 1.8; }
 .page .lead { color: var(--muted); }
-.page table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+.page table { border-collapse: collapse; width: 100%; font-size: .92rem; display: block; overflow-x: auto; }
+.page table tbody, .page table thead { width: 100%; }
+.page h1 { overflow-wrap: anywhere; }
 .page th, .page td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
 .page th { background: var(--panel); white-space: nowrap; }
 .crumbs { color: var(--muted); font-size: .82rem; margin-top: 16px; }

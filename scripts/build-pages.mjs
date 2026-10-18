@@ -360,7 +360,7 @@ async function main() {
     }
   }
 
-  const items = pvp.items.filter(it => it.nn && (it.u || it.h || it.f));
+  const items = pvp.items.filter(it => it.nn && (it.u || it.h || it.f || it.t));
   // 同じタスクで使うアイテム（関連リンク用）
   const byTask = new Map();
   for (const it of items) for (const [ti] of it.u || []) {
