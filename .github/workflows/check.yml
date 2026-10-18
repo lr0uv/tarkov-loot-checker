@@ -1,0 +1,26 @@
+name: Check
+
+# プルリクエストで、スクリプトに文法の誤りがないか、ページが組み立てられるかを確かめる。
+# ここが通ってから main にマージする。
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax check
+        run: for f in site/*.js scripts/*.mjs; do node --check "$f"; done
+      - name: Build pages
+        run: |
+          node scripts/build-pages.mjs dist
+          test -f dist/index.html
+          test -f dist/privacy.html
+          test -f dist/sitemap.xml
+          echo "items: $(ls dist/item | wc -l) / en: $(ls dist/en/item | wc -l)"

@@ -4,70 +4,123 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Tarkov Loot Checker｜タルコフのフリマ価格とKappa・タスク必要アイテム検索</title>
-  <meta name="description" content="Escape from Tarkov のアイテムを名前で検索して、フリマ価格、1マスあたりの価値、Kappa・タスク・ハイドアウトで必要かどうかをすぐ確認できます。PvP・PvE・シーズン対応。">
+  <meta name="description" content="Escape from Tarkov のアイテムを名前で検索して、フリマ価格、手数料を引いた手取り、1マスあたりの価値、Kappa・タスク・ハイドアウトであと何個必要かをすぐ確認できます。進捗管理つき。PvP・PvE・シーズン対応。">
   <meta name="theme-color" content="#101211">
   <meta property="og:title" content="Tarkov Loot Checker">
-  <meta property="og:description" content="タルコフのアイテムを持ち帰るか売るか、数秒で判断。フリマ価格とKappa・タスク・ハイドアウト必要数を表示。">
+  <meta property="og:description" content="タルコフのアイテムを持ち帰るか売るか、数秒で判断。フリマ価格・手取り・Kappaやタスクの残り必要数を表示。">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://tarkov-loot-checker.com/">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23c8b273'/%3E%3Cpath d='M9 9h14v4h-5v10h-4V13H9z' fill='%23101211'/%3E%3C/svg%3E">
+  <link rel="canonical" href="https://tarkov-loot-checker.com/">
   <link rel="alternate" hreflang="ja" href="https://tarkov-loot-checker.com/?lang=ja">
   <link rel="alternate" hreflang="en" href="https://tarkov-loot-checker.com/?lang=en">
   <link rel="alternate" hreflang="x-default" href="https://tarkov-loot-checker.com/">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css?v=5">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"WebApplication","name":"Tarkov Loot Checker","url":"https://tarkov-loot-checker.com/","applicationCategory":"GameApplication","operatingSystem":"Any","inLanguage":["ja","en"],"offers":{"@type":"Offer","price":"0","priceCurrency":"JPY"}}
+  </script>
 </head>
 <body>
   <header class="top">
     <div class="wrap top-inner">
       <a class="logo" href="./" aria-label="Tarkov Loot Checker"><i class="mark" aria-hidden="true">T</i><b>Tarkov <span>Loot Checker</span></b></a>
+      <nav class="nav">
+        <a href="./" data-view="search" data-i18n="navSearch">検索</a>
+        <a href="#progress" data-view="progress" data-i18n="navProgress">進捗</a>
+        <a href="guide/" data-href-ja="guide/" data-href-en="en/guide/" data-i18n="navGuide">ガイド</a>
+      </nav>
       <div class="top-right">
-        <nav class="modes" role="tablist" aria-label="ゲームモード" data-i18n-attr="aria-label:modesLabel">
-          <button class="mode" data-mode="regular" role="tab">PvP</button>
-          <button class="mode" data-mode="pve" role="tab">PvE</button>
-          <button class="mode" data-mode="season" role="tab" disabled data-i18n="season">シーズン</button>
-        </nav>
+        <a class="support" data-support hidden target="_blank" rel="noopener" data-i18n="support">応援する</a>
         <button id="lang" class="lang" type="button" lang="en">English</button>
       </div>
     </div>
+    <div class="wrap modes-row">
+      <nav class="modes" role="tablist" aria-label="ゲームモード" data-i18n-attr="aria-label:modesLabel">
+        <button class="mode" data-mode="regular" role="tab">PvP</button>
+        <button class="mode" data-mode="pve" role="tab">PvE</button>
+        <button class="mode" data-mode="season" role="tab" disabled data-i18n="season">シーズン</button>
+      </nav>
+    </div>
   </header>
 
-  <div class="searchbar">
-    <div class="wrap">
-      <label class="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input id="q" type="search" placeholder="アイテム名・略称で検索（例: グラフィック、gpu、ledx）" data-i18n-attr="placeholder:placeholder,aria-label:placeholder" autocomplete="off" spellcheck="false" enterkeyhint="search">
-        <kbd title="/ キーでいつでも検索欄に移動" data-i18n-attr="title:kbd">/</kbd>
-      </label>
-      <div class="controls">
-        <div class="chips" role="group" aria-label="絞り込み" data-i18n-attr="aria-label:filtersLabel">
-          <button class="chip" data-filter="all" data-i18n="all">すべて</button>
-          <button class="chip kappa" data-filter="kappa">Kappa</button>
-          <button class="chip task" data-filter="task" data-i18n="task">タスク</button>
-          <button class="chip hideout" data-filter="hideout" data-i18n="hideout">ハイドアウト</button>
-        </div>
-        <label class="sort"><span data-i18n="sortLabel">並び順</span>
-          <select id="sort">
-            <option value="auto" data-i18n="sortAuto">おすすめ</option>
-            <option value="slot" data-i18n="sortSlot">1マスの価値</option>
-            <option value="price" data-i18n="sortPrice">売値</option>
-          </select>
+  <div id="view-search">
+    <div class="searchbar">
+      <div class="wrap">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="アイテム名・略称で検索（例: グラボ、gpu、ledx）" data-i18n-attr="placeholder:placeholder,aria-label:placeholder" autocomplete="off" spellcheck="false" enterkeyhint="search">
+          <kbd title="/ キーでいつでも検索欄に移動" data-i18n-attr="title:kbd">/</kbd>
         </label>
+        <div class="controls">
+          <div class="chips" role="group" aria-label="絞り込み" data-i18n-attr="aria-label:filtersLabel">
+            <button class="chip" data-filter="all" data-i18n="all">すべて</button>
+            <button class="chip kappa" data-filter="kappa">Kappa</button>
+            <button class="chip task" data-filter="task" data-i18n="task">タスク</button>
+            <button class="chip hideout" data-filter="hideout" data-i18n="hideout">ハイドアウト</button>
+          </div>
+          <label class="sort"><span data-i18n="sortLabel">並び順</span>
+            <select id="sort">
+              <option value="auto" data-i18n="sortAuto">おすすめ</option>
+              <option value="slot" data-i18n="sortSlot">1マスの価値</option>
+              <option value="price" data-i18n="sortPrice">売値</option>
+            </select>
+          </label>
+        </div>
       </div>
     </div>
+
+    <main class="wrap">
+      <div id="notice" class="notice" hidden></div>
+      <div id="kappa-bar" class="kappa-bar" hidden></div>
+      <p id="meta" class="meta" data-i18n="loading">データを読み込み中…</p>
+      <ul id="list" class="list"></ul>
+      <p id="more" class="more" hidden></p>
+    </main>
   </div>
 
-  <main class="wrap">
-    <div id="notice" class="notice" hidden></div>
-    <p id="meta" class="meta" data-i18n="loading">データを読み込み中…</p>
-    <ul id="list" class="list"></ul>
-    <p id="more" class="more" hidden></p>
+  <main id="view-progress" class="wrap progress" hidden>
+    <h1 data-i18n="pTitle">進捗管理</h1>
+    <p id="p-intro" class="intro"></p>
+    <div id="p-stats" class="stats"></div>
+    <div class="ptabs" role="tablist">
+      <button class="ptab" data-ptab="tasks" role="tab" data-i18n="pTasks">タスク</button>
+      <button class="ptab" data-ptab="hideout" role="tab" data-i18n="pHideout">ハイドアウト</button>
+      <button class="ptab" data-ptab="transfer" role="tab" data-i18n="pTransfer">引き継ぎ</button>
+    </div>
+    <section class="ppanel" data-ptab="tasks">
+      <input id="p-filter" class="pfilter" type="search" placeholder="タスク名・トレーダーで絞り込み" data-i18n-attr="placeholder:pFilter,aria-label:pFilter" autocomplete="off">
+      <div class="popts">
+        <label><input id="p-cascade" type="checkbox" checked> <span data-i18n="pCascade">前提タスクもまとめて完了にする</span></label>
+        <label><input id="p-only" type="checkbox" checked> <span data-i18n="pOnlyItems">アイテムが必要なタスクだけ表示</span></label>
+      </div>
+      <div id="p-tasks"></div>
+    </section>
+    <section class="ppanel" data-ptab="hideout" hidden>
+      <div id="p-hideout"></div>
+    </section>
+    <section class="ppanel" data-ptab="transfer" hidden>
+      <p class="intro" data-i18n="pTransferHelp"></p>
+      <button id="p-copy" class="btn" type="button" data-i18n="pCopy">進捗コードをコピー</button>
+      <textarea id="p-code" class="code" rows="4" placeholder="進捗コードを貼り付け" data-i18n-attr="placeholder:pPaste,aria-label:pPaste"></textarea>
+      <button id="p-load" class="btn" type="button" data-i18n="pLoad">読み込む</button>
+      <p id="p-msg" class="meta" role="status"></p>
+      <button id="p-reset" class="btn danger" type="button" data-i18n="pReset">このモードの進捗をすべて消す</button>
+    </section>
   </main>
 
   <footer class="wrap footer">
+    <nav class="footnav">
+      <a href="about.html" data-href-ja="about.html" data-href-en="en/about.html" data-i18n="footAbout">このサイトについて</a>
+      <a href="privacy.html" data-href-ja="privacy.html" data-href-en="en/privacy.html" data-i18n="footPrivacy">プライバシーポリシー</a>
+      <a href="contact.html" data-href-ja="contact.html" data-href-en="en/contact.html" data-i18n="footContact">お問い合わせ</a>
+      <a data-support hidden target="_blank" rel="noopener" data-i18n="support">応援する</a>
+    </nav>
     <p id="foot-data">価格・タスク・ハイドアウトのデータ: <a href="https://tarkov.dev" target="_blank" rel="noopener">tarkov.dev</a>（5分ごとに自動更新）</p>
     <p data-i18n="footFan">本サイトは非公式のファンサイトで、Battlestate Games とは関係ありません。</p>
   </footer>
 
-  <script src="app.js?v=4"></script>
+  <script src="config.js?v=5"></script>
+  <script src="common.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
