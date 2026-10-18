@@ -1,6 +1,6 @@
 name: Update data
 
-# tarkov.dev から最新データを取り、data ブランチに保存する。
+# tarkov.dev（json.tarkov.dev）から最新データを取り、data ブランチに保存する。
 # サイトは data ブランチのファイルを raw.githubusercontent.com 経由で読む。
 on:
   schedule:
@@ -32,10 +32,6 @@ jobs:
           if git fetch --depth 1 origin data; then
             git --work-tree=out checkout FETCH_HEAD -- . || true
           fi
-
-      - name: Probe json.tarkov.dev
-        continue-on-error: true
-        run: node scripts/probe-json.mjs
 
       - name: Build data
         run: node scripts/build-data.mjs out
